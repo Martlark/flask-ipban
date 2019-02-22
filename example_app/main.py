@@ -34,5 +34,11 @@ def block_it(ip):
     return 'ok'
 
 
+@app.route('/add_it')
+def add_it():
+    new_count = ip_ban.add(reason='spite')
+    return 'ok: observations is now: {}'.format(new_count)
+
+
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8888, debug=True)

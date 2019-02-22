@@ -1,0 +1,6 @@
+flask>=1.0.2
+pytest
+tox
+twine
+
+

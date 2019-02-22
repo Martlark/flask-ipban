@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc.
+# Copyright 2015 Andrew Rowe.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,22 +16,20 @@ from codecs import open
 
 from setuptools import setup
 
-
 long_description = open('README.rst', 'r', encoding='utf-8').read()
 
-
 setup(
-    name='flask-talisman',
+    name='flask-ipban',
 
-    version='0.6.0',
+    version='0.1.0',
 
-    description='HTTP security headers for Flask.',
+    description='HTTP spam security for Flask.',
     long_description=long_description,
 
-    url='https://github.com/GoogleCloudPlatform/flask-talisman',
+    url='https://github.com/Martlark/flask-ipban',
 
-    author='Thea Flowers',
-    author_email='theaflowers@google.com',
+    author='Andrew Rowe',
+    author_email='rowe.andrew.d@gmail.com',
 
     license='Apache Software License',
 
@@ -55,9 +53,9 @@ setup(
         'Operating System :: MacOS',
         'Operating System :: Unix',
     ],
-    keywords='flask security https xss',
+    keywords='flask security https spam url ban',
 
-    packages=['flask_talisman'],
+    packages=['flask_ipban'],
 
-    install_requires=['six>=1.9.0'],
+    install_requires=['flask>=1.0.2'],
 )

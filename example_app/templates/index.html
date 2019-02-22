@@ -18,45 +18,73 @@
 <head>
     <title>{{ title }}</title>
     <script>
-        function banMe(ban_count) {
-            for (let x = 0; x < ban_count; x++) {
-                fetch('/does_not_exist').then(response => {
+        class View {
+
+            setMessage(message) {
+                document.getElementById('message').innerText = message;
+            }
+
+            banMe(ban_count) {
+                for (let x = 0; x < ban_count; x++) {
+                    fetch('/does_not_exist').then(response => {
+                        switch (response.status) {
+                            case 403:
+                                this.setMessage("Forbidden: I've been banned");
+                                break;
+                            case 404:
+                                this.setMessage("Page not found");
+                                break;
+                            default:
+                                this.setMessage(`Unexpected status ${response.status}`);
+                                break;
+                        }
+                        return;
+                    }).catch(err => {
+                        this.setMessage(`Error: ${err}`);
+                    })
+                }
+            }
+
+            addToBan(ip) {
+                fetch(`/block_it/${ip}`).then(response => {
                     switch (response.status) {
-                        case 403:
-                            document.getElementById('message').innerText = "Forbidden: I've been banned";
+                        case 200:
+                            this.setMessage("Added to ban list");
                             break;
-                        case 404:
-                            document.getElementById('message').innerText = "Page not found";
+                        case 403:
+                            this.setMessage("Forbidden");
                             break;
                         default:
-                            document.getElementById('message').innerText = `Unexpected status ${response.status}`;
+                            this.setMessage(`Unexpected status ${response.status}`);
                             break;
                     }
                     return;
                 }).catch(err => {
-                    document.getElementById('message').innerText = `Error: ${err}`;
+                    this.setMessage(`Error: ${err}`);
+                })
+            }
+
+            addIt() {
+                fetch(`/add_it`).then(response => {
+                    switch (response.status) {
+                        case 200:
+                            response.text().then(value => this.setMessage(value));
+                            break;
+                        case 403:
+                            this.setMessage("Forbidden");
+                            break;
+                        default:
+                            this.setMessage(`Unexpected status ${response.status}`);
+                            break;
+                    }
+                    return;
+                }).catch(err => {
+                    this.setMessage(`Error: ${err}`);
                 })
             }
         }
 
-        function addToBan(ip) {
-            fetch(`/block_it/${ip}`).then(response => {
-                switch (response.status) {
-                    case 200:
-                        document.getElementById('message').innerText = "Added to ban list";
-                        break;
-                    case 403:
-                        document.getElementById('message').innerText = "Forbidden";
-                        break;
-                    default:
-                        document.getElementById('message').innerText = `Unexpected status ${response.status}`;
-                        break;
-                }
-                return;
-            }).catch(err => {
-                document.getElementById('message').innerText = `Error: ${err}`;
-            })
-        }
+        var controller = new View();
     </script>
 </head>
 <body>
@@ -64,7 +92,8 @@
 <h1>{{ title }}</h1>
 <p>Load a page from an unnamed location until it goes 403</p>
 <h3 id="message"></h3>
-<button onclick="banMe({{ ban_count }})">Repeat until banned</button>
-<button onclick="addToBan('127.0.0.1')">Add 127.0.0.1 to block list</button>
+<button onclick="controller.banMe({{ ban_count }})">Repeat until banned</button>
+<button onclick="controller.addToBan('127.0.0.1')">Add 127.0.0.1 to block list</button>
+<button onclick="controller.addIt()">Increment observations of this ip</button>
 </body>
 </html>

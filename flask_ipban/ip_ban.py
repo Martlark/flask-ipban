@@ -23,7 +23,7 @@ class IpBan:
         :param ban_count: (optional) number of observations before ban
         :param ban_minutes: (optional) number minutes of silence before ban rescinded (0 is never rescind)
         """
-        self.ip_ban_list = {}
+        self._ip_ban_list = {}
         self.ban_count = int(os.environ.get('IP_BAN_LIST_COUNT', ban_count))
         self.ban_seconds = int(os.environ.get('IP_BAN_LIST_MINUTES', ban_minutes)) * 60
         self.app = None
@@ -52,16 +52,16 @@ class IpBan:
         :param permanent: (optional) True=do not allow entries to expire
         """
         for ip in ip_list:
-            entry = self.ip_ban_list.get(ip)
+            entry = self._ip_ban_list.get(ip)
             if entry:
                 entry['timestamp'] = datetime.utcnow()
                 entry['count'] = self.ban_count * 2
             else:
-                self.ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=self.ban_count*2)
+                self._ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=self.ban_count * 2)
 
             if permanent:
                 # ban for about 38 years
-                entry = self.ip_ban_list[ip]
+                entry = self._ip_ban_list[ip]
                 entry['timestamp'] = datetime.utcnow() + timedelta(minutes=20000000)
             self.app.logger.warning('{ip} added to ban list.'.format(ip=ip))
 
@@ -70,7 +70,7 @@ class IpBan:
         raise 403 exception if ip in request has made too many 404 or failed login attempts
         """
         ip = request.environ.get('REMOTE_ADDR')
-        entry = self.ip_ban_list.get(ip)
+        entry = self._ip_ban_list.get(ip)
         if entry and entry.get('count', 0) > self.ban_count:
             url = request.environ.get('PATH_INFO')
             utc_now = datetime.utcnow()
@@ -80,7 +80,7 @@ class IpBan:
                 abort(403)
             else:
                 self.app.logger.exception('IP expired from ban list {}.  Url: {}'.format(ip, url))
-                self.ip_ban_list[ip]['count'] = 0
+                self._ip_ban_list[ip]['count'] = 0
 
     def add(self, reason='404'):
         """
@@ -90,16 +90,17 @@ class IpBan:
 
         ip = request.environ.get('REMOTE_ADDR')
         url = request.environ.get('PATH_INFO')
-        entry = self.ip_ban_list.get(ip)
+        entry = self._ip_ban_list.get(ip)
         if entry:
             entry['timestamp'] = datetime.utcnow()
             entry['count'] += 1
         else:
-            self.ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=1)
-            entry = self.ip_ban_list[ip]
+            self._ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=1)
+            entry = self._ip_ban_list[ip]
 
         self.app.logger.warning(
             '{}. url {}.  {} in ban list. count: {}'.format(reason,
                                                             url,
                                                             ip,
                                                             entry['count']))
+        return entry['count']
