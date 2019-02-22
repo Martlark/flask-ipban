@@ -12,51 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from flask import Flask, render_template, request
-from flask_seasurf import SeaSurf
-from flask_talisman import Talisman
+from flask import Flask, render_template
 
+from flask_ipban.ip_ban import IpBan
 
 app = Flask(__name__)
-app.secret_key = '123abc'
-csrf = SeaSurf(app)
 
-SELF = "'self'"
-talisman = Talisman(
-    app,
-    content_security_policy={
-        'default-src': SELF,
-        'img-src': '*',
-        'script-src': [
-            SELF,
-            'some.cdn.com',
-        ],
-        'style-src': [
-            SELF,
-            'another.cdn.com',
-        ],
-    },
-    content_security_policy_nonce_in=['script-src'],
-    feature_policy={
-        'geolocation': '\'none\'',
-    }
-)
+ban_count = 5
+
+ip_ban = IpBan(app=app, ban_count=ban_count, ban_minutes=5)
 
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
 def index():
-    message = request.form.get('message', None)
-    return render_template('index.html', message=message)
+    return render_template('index.html', title='Ip Ban sample app', ban_count=ban_count)
 
 
-# Example of a route-specific talisman configuration
-@app.route('/embeddable')
-@talisman(
-    frame_options='ALLOW-FROM',
-    frame_options_allow_from='https://example.com/',
-)
-def embeddable():
-    return "<html>I can be embedded.</html>"
+@app.route('/block_it/<path:ip>')
+def block_it(ip):
+    ip_ban.block([ip])
+    return 'ok'
 
 
 if __name__ == '__main__':

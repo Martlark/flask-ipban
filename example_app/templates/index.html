@@ -1,5 +1,5 @@
 {#
-# Copyright 2015 Google Inc.
+# Copyright 2019 Andrew Rowe.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,35 +16,55 @@
 <!doctype html>
 <html>
 <head>
-  <title>Talisman sample app</title>
+    <title>{{ title }}</title>
+    <script>
+        function banMe(ban_count) {
+            for (let x = 0; x < ban_count; x++) {
+                fetch('/does_not_exist').then(response => {
+                    switch (response.status) {
+                        case 403:
+                            document.getElementById('message').innerText = "Forbidden: I've been banned";
+                            break;
+                        case 404:
+                            document.getElementById('message').innerText = "Page not found";
+                            break;
+                        default:
+                            document.getElementById('message').innerText = `Unexpected status ${response.status}`;
+                            break;
+                    }
+                    return;
+                }).catch(err => {
+                    document.getElementById('message').innerText = `Error: ${err}`;
+                })
+            }
+        }
+
+        function addToBan(ip) {
+            fetch(`/block_it/${ip}`).then(response => {
+                switch (response.status) {
+                    case 200:
+                        document.getElementById('message').innerText = "Added to ban list";
+                        break;
+                    case 403:
+                        document.getElementById('message').innerText = "Forbidden";
+                        break;
+                    default:
+                        document.getElementById('message').innerText = `Unexpected status ${response.status}`;
+                        break;
+                }
+                return;
+            }).catch(err => {
+                document.getElementById('message').innerText = `Error: ${err}`;
+            })
+        }
+    </script>
 </head>
 <body>
 
-<h1>Talisman + Seasurf Sample</h1>
-
-{% if message: %}
-<h3>Your message:</h3>
-<div>{{message}}</div>
-{% endif %}
-
-<form method="POST">
-  <input type="hidden" name="_csrf_token" value="{{csrf_token()}}">
-  <textarea name="message" placeholder="Enter message..."></textarea>
-  <button type="submit">Submit</button>
-</form>
-
-<script>
-  // This script is forbidden
-  console.log("Oh no, this should not have run!!")
-</script>
-
-<script nonce="{{ csp_nonce() }}">
-  // This one isn't
-  console.log("Yay, nonce allowed to run this.")
-  navigator.geolocation.getCurrentPosition(function(position) {
-    console.log('Oh no, geolocation access should be denied');
-  });
-</script>
-
+<h1>{{ title }}</h1>
+<p>Load a page from an unnamed location until it goes 403</p>
+<h3 id="message"></h3>
+<button onclick="banMe({{ ban_count }})">Repeat until banned</button>
+<button onclick="addToBan('127.0.0.1')">Add 127.0.0.1 to block list</button>
 </body>
 </html>
