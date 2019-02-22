@@ -61,3 +61,6 @@ target/
 # Editor files
 *.swp
 *.swo
+.idea
+venv*/
+
