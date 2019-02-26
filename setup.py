@@ -21,7 +21,7 @@ long_description = open('README.rst', 'r', encoding='utf-8').read()
 setup(
     name='flask-ipban',
 
-    version='0.1.1',
+    version='0.1.2',
 
     description='HTTP spam security for Flask.',
     long_description=long_description,
