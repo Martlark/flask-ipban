@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All Rights Reserved.
+# Copyright 2019 Andrew Rowe Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from flask import Flask, render_template
+from flask import Flask, render_template, abort, request
 
 from flask_ipban.ip_ban import IpBan
 
@@ -20,7 +20,9 @@ app = Flask(__name__)
 
 ban_count = 5
 
-ip_ban = IpBan(app=app, ban_count=ban_count, ban_minutes=5)
+ip_ban = IpBan(app=app, ban_count=ban_count, ban_seconds=5)
+ip_ban.url_pattern_add('/tmp/\\d*$')
+ip_ban.url_pattern_add('/whitelist/\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b$')
 
 
 @app.route('/')
@@ -34,10 +36,28 @@ def block_it(ip):
     return 'ok'
 
 
+@app.route('/tmp/<int:random_int>')
+def ignore_it(random_int):
+    url = request.environ.get('PATH_INFO')
+    app.logger.info('404 will be ignored: url: {}'.format(url))
+    abort(404)
+    return 'ok'
+
+
 @app.route('/add_it')
 def add_it():
-    new_count = ip_ban.add(reason='spite')
-    return 'ok: observations is now: {}'.format(new_count)
+    result = ip_ban.add(reason='spite')
+    return 'ok: observation added: {}'.format(result)
+
+
+@app.route('/whitelist/<string:ip>', methods=['PUT', 'DELETE'])
+def whitelist_ip(ip):
+    result = 'error: unknown method'
+    if request.method == 'PUT':
+        result = 'Added.  {} entries in the whitelist'.format(ip_ban.ip_whitelist_add(ip))
+    elif request.method == 'DELETE':
+        result = '{} removed'.format(ip) if ip_ban.ip_whitelist_remove(ip) else '{} not in whitelist'.format(ip)
+    return result
 
 
 if __name__ == '__main__':

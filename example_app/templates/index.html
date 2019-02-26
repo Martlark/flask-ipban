@@ -14,86 +14,84 @@
 # limitations under the License.
 #}
 <!doctype html>
-<html>
+<html lang="en">
 <head>
     <title>{{ title }}</title>
-    <script>
-        class View {
-
-            setMessage(message) {
-                document.getElementById('message').innerText = message;
-            }
-
-            banMe(ban_count) {
-                for (let x = 0; x < ban_count; x++) {
-                    fetch('/does_not_exist').then(response => {
-                        switch (response.status) {
-                            case 403:
-                                this.setMessage("Forbidden: I've been banned");
-                                break;
-                            case 404:
-                                this.setMessage("Page not found");
-                                break;
-                            default:
-                                this.setMessage(`Unexpected status ${response.status}`);
-                                break;
-                        }
-                        return;
-                    }).catch(err => {
-                        this.setMessage(`Error: ${err}`);
-                    })
-                }
-            }
-
-            addToBan(ip) {
-                fetch(`/block_it/${ip}`).then(response => {
-                    switch (response.status) {
-                        case 200:
-                            this.setMessage("Added to ban list");
-                            break;
-                        case 403:
-                            this.setMessage("Forbidden");
-                            break;
-                        default:
-                            this.setMessage(`Unexpected status ${response.status}`);
-                            break;
-                    }
-                    return;
-                }).catch(err => {
-                    this.setMessage(`Error: ${err}`);
-                })
-            }
-
-            addIt() {
-                fetch(`/add_it`).then(response => {
-                    switch (response.status) {
-                        case 200:
-                            response.text().then(value => this.setMessage(value));
-                            break;
-                        case 403:
-                            this.setMessage("Forbidden");
-                            break;
-                        default:
-                            this.setMessage(`Unexpected status ${response.status}`);
-                            break;
-                    }
-                    return;
-                }).catch(err => {
-                    this.setMessage(`Error: ${err}`);
-                })
-            }
-        }
-
-        var controller = new View();
-    </script>
+    <script src="{{ url_for('static', filename='index.js') }}" defer="defer"></script>
 </head>
 <body>
 
 <h1>{{ title }}</h1>
-<p>Load a page from an unnamed location until it goes 403</p>
-<h3 id="message"></h3>
-<button onclick="controller.banMe({{ ban_count }})">Repeat until banned</button>
-<button onclick="controller.addToBan('127.0.0.1')">Add 127.0.0.1 to block list</button>
-<button onclick="controller.addIt()">Increment observations of this ip</button>
+<h3 style="background: antiquewhite" id="message"></h3>
+<table>
+    <thead>
+    <tr>
+        <th>Action</th>
+        <th>Description</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+        <td>
+            <button onclick="controller.getIndex()">Test get</button>
+        </td>
+        <td>
+            Get the index page to test if banned
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <button onclick="controller.banMe({{ ban_count }})">Repeat until banned</button>
+        </td>
+        <td>
+            Repeat fetch of an unknown page until this ip is banned
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <button onclick="controller.addToBan('127.0.0.1')">Add 127.0.0.1 to block list</button>
+        </td>
+        <td>
+            Add this ip to the banned list
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <button onclick="controller.addIt()">Increment observations of this ip</button>
+
+        </td>
+        <td>
+            Manually increment the ban count for this ip in the ban list
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <button onclick="controller.ignoreTest({{ ban_count }})">Get /tmp/(random number) that should be ignored</button>
+
+        </td>
+        <td>
+            The url this action fetches is in the ignore list and won't raise a 403 no matter how many times called
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <button onclick="controller.whiteListAdd('127.0.0.1')">Add to whitelist</button>
+        </td>
+        <td>
+            Adds this ip to the whitelist and won't raise a 403 anymore
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <button onclick="controller.whiteListRemove('127.0.0.1')">Remove from whitelist</button>
+        </td>
+        <td>
+            Removes this ip from the whitelist. Any existing ban will operate again.
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+
 </body>
 </html>
