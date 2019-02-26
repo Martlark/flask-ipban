@@ -19,3 +19,4 @@ from .ip_ban import (
 __all__ = (
     'IpBan',
 )
+__package__ = 'ip_ban'

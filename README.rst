@@ -37,21 +37,19 @@ Options
 -------
 
 -  ``ban_count``, default ``50``, Number of observations before banning
--  ``ban_minutes``, default ``60``, Number of minutes ip address is banned
+-  ``ban_seconds``, default ``60``, Number of seconds ip address is banned
 -  ``ip_ban.block(ip_address, permanent=True)`` - block the specific address forever
 -  ``ip_ban.add(reason='spite')`` - increase the observation for the current request ip
 
 Per-view options
 ~~~~~~~~~~~~~~~~
 
-Sometimes you want to change the policy for a specific view. The
-``force_https``, ``frame_options``, ``frame_options_allow_from``, and
-``content_security_policy`` options can be changed on a per-view basis.
+Example code
 
 .. code:: python
 
     from flask import Flask
-    from flask_ipban import IpBan, ALLOW_FROM
+    from flask_ipban import IpBan
 
     app = Flask(__name__)
     ip_ban = IpBan(app)

@@ -13,7 +13,7 @@ class IpBan:
     Optional config by env variable
     ======
     IP_BAN_LIST_COUNT - number of entries before 403 exception
-    IP_BAN_LIST_MINUTES - number of minutes to retain memory of IP
+    IP_BAN_LIST_SECONDS - number of minutes to retain memory of IP
 
     """
 
