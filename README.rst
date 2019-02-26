@@ -66,3 +66,10 @@ Licensing
 
 .. |PyPI Version| image:: https://img.shields.io/pypi/v/flask-ipban.svg
    :target: https://pypi.python.org/pypi/flask-ipban
+
+Twine
+-----
+
+
+. venv/bin/activate
+twine upload --repository-url https://test.pypi.org/legacy/ dist/*

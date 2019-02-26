@@ -4,6 +4,8 @@ from datetime import datetime
 
 from flask import request, abort
 
+__all__ = ('IpBan')
+
 
 class IpBan:
     """
