@@ -1,4 +1,8 @@
-# commands to upload to pypi
+# Notes and commands to upload to pypi
+#
+# https://medium.com/@joel.barmettler/how-to-upload-your-python-package-to-pypi-65edc5fe9c56
+# https://pypi.org/project/twine/
+#
 # edit setup.py
 # to update the version
 
@@ -13,4 +17,9 @@ pip install twine
 # on each release
 
 python3 setup.py sdist bdist_wheel
+#
+twine check dist/flask_ipban-0.1.4*
+# test
 twine upload --repository-url https://test.pypi.org/legacy/ dist/* -u martlark
+# prod pypi
+twine upload dist/* -u martlark

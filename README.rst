@@ -57,6 +57,7 @@ Example code
     @app.route('/normal')
     def normal():
         return 'Normal'
+
 Licensing
 ---------
 
