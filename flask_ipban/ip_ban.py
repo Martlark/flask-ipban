@@ -79,7 +79,6 @@ class IpBan:
             return
 
         ip = request.environ.get('REMOTE_ADDR')
-        url = request.environ.get('PATH_INFO')
 
         entry = self._ip_ban_list.get(ip)
         if entry and entry.get('count', 0) > self.ban_count:
@@ -92,6 +91,7 @@ class IpBan:
 
             if delta.seconds < self.ban_seconds or self.ban_seconds == 0:
                 self.app.logger.warning('IP is in ban list {}.  Url: {}'.format(ip, url))
+                entry['timestamp'] = datetime.utcnow()
                 abort(403)
             else:
                 self.app.logger.warning('IP expired from ban list {}.  Url: {}'.format(ip, url))

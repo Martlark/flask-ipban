@@ -1,0 +1,16 @@
+# commands to upload to pypi
+# edit setup.py
+# to update the version
+
+. venv36/bin/activate
+
+# first
+
+pip install setuptools
+pip install wheel
+pip install twine
+
+# on each release
+
+python3 setup.py sdist bdist_wheel
+twine upload --repository-url https://test.pypi.org/legacy/ dist/* -u martlark
