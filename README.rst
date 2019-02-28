@@ -11,6 +11,13 @@ The default configuration:
 - 50 attempts before ban
 - 1 hour blocking period
 
+Once an ip address is banned any attempt to access a web address will result in a 403 forbidden
+result.  After the default 1 hour blocking period of no access attempts the ban will be lifted.
+Any access attempt during the ban period will extend the ban period.
+
+Ip addresses can be manually entered for banning.  Url patterns can be configured to be excluded
+from ban calculations.
+
 Installation & Basic Usage
 --------------------------
 
@@ -38,11 +45,21 @@ Options
 
 -  ``ban_count``, default ``50``, Number of observations before banning
 -  ``ban_seconds``, default ``60``, Number of seconds ip address is banned
--  ``ip_ban.block(ip_address, permanent=True)`` - block the specific address forever
--  ``ip_ban.add(reason='spite')`` - increase the observation for the current request ip
 
-Per-view options
-~~~~~~~~~~~~~~~~
+
+Methods
+-------
+
+-  ``block(ip_address, permanent=False)`` - block the specific address optionally forever
+-  ``add(reason='404')`` - increase the observations for the current request ip
+-  ``url_pattern_add('reg-ex-pattern')`` - exclude any url matching the pattern from checking
+-  ``url_pattern_remove('reg-ex-pattern')`` - remove pattern from the url whitelist
+-  ``url_block_pattern_add('reg-ex-pattern', match_type='regex')`` - add any url matching the pattern to the block list. match_type can be 'string' or 'regex'.  String is direct match.  Regex is a regex pattern.
+-  ``url_block_pattern_remove('reg-ex-pattern')`` - remove pattern from the url block list
+-  ``ip_whitelist_add('ip-address')`` - exclude the given ip from checking
+-  ``ip_whitelist_remove('ip-address')`` - remove the given ip from the ip whitelist
+-  ``load_nuisances(file_name=None)`` - add a list of nuisances to url pattern block list from a file.  See below for more information.
+
 
 Example code
 
@@ -57,6 +74,20 @@ Example code
     @app.route('/normal')
     def normal():
         return 'Normal'
+
+Nuisance file
+-------------
+
+ip_ban includes a file of common web nuisances that should not be allowed on a flask site.  It includes:
+
+- Blocking any non flask extension such as .jsp, .asp etc.
+- Known hacking urls.
+
+Load them by calling ip_ban.load_nuisances()
+
+You can add your own nuisance file by calling with the parameter file_name=.
+
+See the nuisance.txt file in the source for formatting and details.
 
 Licensing
 ---------

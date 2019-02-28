@@ -22,11 +22,12 @@ import flask
 
 from flask_ipban.ip_ban import IpBan
 
-page_text = 'Hello, world'
+page_text = 'Hello, world. {}'
 localhost = '127.0.0.1'
 
-def hello_world():
-    return page_text
+
+def hello_world(parameter=None):
+    return page_text.format(parameter)
 
 
 class TestIpBan(unittest.TestCase):
@@ -38,6 +39,7 @@ class TestIpBan(unittest.TestCase):
         self.client = self.app.test_client()
 
         self.app.route('/')(hello_world)
+        self.app.route('/good/<int:num>')(hello_world)
 
     def testDefaults(self):
         # HTTPS request.
@@ -46,12 +48,12 @@ class TestIpBan(unittest.TestCase):
 
     def testAddRemoveIpWhitelist(self):
         self.assertEqual(self.ip_ban.ip_whitelist_add(localhost), 1)
-        for x in range(self.ip_ban.ban_count*2):
+        for x in range(self.ip_ban.ban_count * 2):
             response = self.client.get('/doesnotexist')
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         self.assertTrue(self.ip_ban.ip_whitelist_remove(localhost))
-        for x in range(self.ip_ban.ban_count*2):
+        for x in range(self.ip_ban.ban_count * 2):
             response = self.client.get('/doesnotexist')
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
@@ -60,17 +62,17 @@ class TestIpBan(unittest.TestCase):
     def testAddRemoveUrlWhitelist(self):
         test_pattern = '^/no_exist/[0-9]+$'
         test_url = '/no_exist'
-        self.assertTrue(re.match(test_pattern, test_url+'/123'))
+        self.assertTrue(re.match(test_pattern, test_url + '/123'))
         self.assertFalse(re.match(test_pattern, test_url))
 
         self.assertEqual(self.ip_ban.url_pattern_add(test_pattern), 1)
-        for x in range(self.ip_ban.ban_count*2):
+        for x in range(self.ip_ban.ban_count * 2):
             self.client.get('{}/{}'.format(test_url, x))
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
 
         self.assertTrue(self.ip_ban.url_pattern_remove(test_pattern))
-        for x in range(self.ip_ban.ban_count*2):
+        for x in range(self.ip_ban.ban_count * 2):
             self.client.get('{}/{}'.format(test_url, x))
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
@@ -84,11 +86,11 @@ class TestIpBan(unittest.TestCase):
 
     def testTimeout(self):
         test_url = '/doesnotexist'
-        for x in range(self.ip_ban.ban_count*2):
+        for x in range(self.ip_ban.ban_count * 2):
             self.client.get('{}/{}'.format(test_url, x))
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
-        time.sleep(self.ban_seconds+1)
+        time.sleep(self.ban_seconds + 1)
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
 
@@ -96,7 +98,7 @@ class TestIpBan(unittest.TestCase):
         self.ip_ban.block([localhost], permanent=True)
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
-        time.sleep(self.ban_seconds+2)
+        time.sleep(self.ban_seconds + 2)
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
 
@@ -106,7 +108,7 @@ class TestIpBan(unittest.TestCase):
         self.ip_ban.add(ip=localhost, url='/', reason='spite')
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
-        for x in range(self.ip_ban.ban_count+1):
+        for x in range(self.ip_ban.ban_count + 1):
             self.ip_ban.add(ip=localhost, url='/', reason='spite')
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
@@ -114,11 +116,70 @@ class TestIpBan(unittest.TestCase):
     def testKeepOnBlocking(self):
         # block should not timeout if spamming continues
         test_url = '/doesnotexist'
-        for x in range(self.ip_ban.ban_count*2):
+        for x in range(self.ip_ban.ban_count * 2):
             self.client.get('{}/{}'.format(test_url, x))
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
-        for x in range(self.ban_seconds*2):
+        for x in range(self.ban_seconds * 2):
             time.sleep(1)
             response = self.client.get('/')
             self.assertEqual(response.status_code, 403)
+
+    def testAddRemoveUrlBlocklist(self):
+        test_pattern = '^/good/[0-9]+$'
+        test_url = '/good'
+        self.assertTrue(re.match(test_pattern, test_url + '/123'))
+        self.assertFalse(re.match(test_pattern, test_url))
+
+        # no block
+        response = self.client.get('{}/{}'.format(test_url, 456))
+        self.assertEqual(response.status_code, 200)
+
+        # getting index page is blocked after block url get
+        self.assertEqual(self.ip_ban.url_block_pattern_add(test_pattern), 1)
+        response = self.client.get('{}/{}'.format(test_url, 123))
+        self.assertEqual(response.status_code, 403)
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 403)
+
+        # ban remains even after timeout
+        time.sleep(self.ban_seconds + 1)
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get('{}/{}'.format(test_url, 123))
+        self.assertEqual(response.status_code, 403)
+
+        # ban remains even after pattern removed
+        self.assertTrue(self.ip_ban.url_block_pattern_remove(test_pattern))
+        response = self.client.get('{}/{}'.format(test_url, 200))
+        self.assertEqual(response.status_code, 403)
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 403)
+
+        self.assertFalse(self.ip_ban.url_block_pattern_remove(localhost))
+
+    def testLoadNuisances(self):
+        self.app.route('/regextest/page.<parameter>')(hello_world)
+        # test is ok before nuisances loaded
+        response = self.client.get('/regextest/page.{e}?yolo={e}'.format(e='jsp'))
+        self.assertEqual(response.status_code, 200)
+        self.ip_ban.load_nuisances()
+
+        # test blocked extensions
+        for e in ['php', 'jsp', 'aspx', 'do', 'cgi']:
+            self.assertTrue(self.ip_ban.test_pattern_blocklist('/regextest/page.{}'.format(e)), e)
+
+        # and with parameters
+        for e in ['php', 'jsp', 'aspx', 'do', 'cgi']:
+            self.assertTrue(self.ip_ban.test_pattern_blocklist('/regextest/page.{e}?extension={e}'.format(e=e)), e)
+
+        # test blocked url strings and patterns
+        for e in ['/admin/assets/js/views/login.js', '/vip163mx00.mxmail.netease.com:25', '/manager/html']:
+            self.assertTrue(self.ip_ban.test_pattern_blocklist(e), e)
+
+        e = 'jsp'
+        response = self.client.get('/regextest/page.{}'.format(e))
+        self.assertEqual(response.status_code, 403, e)
+        # this ip is no blocked
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 403)
