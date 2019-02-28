@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import os
+import pickle
 import re
+import tempfile
 from urllib.parse import urlparse
 from datetime import datetime
 
@@ -32,7 +34,7 @@ class IpBan:
 
     """
 
-    def __init__(self, app=None, ban_count=50, ban_seconds=3600):
+    def __init__(self, app=None, ban_count=50, ban_seconds=3600, persist=False, persist_file_name=None):
         """
         start
         :param app: (optional when using init_app) flask application with logger defined
@@ -46,6 +48,11 @@ class IpBan:
         self.ban_count = int(os.environ.get('IP_BAN_LIST_COUNT', ban_count))
         self.ban_seconds = int(os.environ.get('IP_BAN_LIST_SECONDS', ban_seconds))
         self.app = None
+        self._persist = persist
+        self._persist_file_name = os.path.join(tempfile.gettempdir(), 'flask-ip-ban-persistence.pickle')
+        if persist_file_name:
+            self._persist_file_name = persist_file_name
+
         if app:
             self.init_app(app)
 
@@ -56,8 +63,25 @@ class IpBan:
         :return:
         """
         self.app = app
+        self._persist_read()
         app.after_request(self.after_request)
         app.before_request(self.before_request_check)
+
+    def _persist_write(self):
+        if self._persist:
+            try:
+                with open(self._persist_file_name, 'wb') as f:
+                    pickle.dump(self._ip_ban_list, f, protocol=pickle.HIGHEST_PROTOCOL)
+            except Exception as e:
+                self.app.logger.exception('error writing persistence file {}. {}'.format(self._persist_file_name, e))
+
+    def _persist_read(self):
+        if self._persist:
+            try:
+                with open(self._persist_file_name, 'rb') as f:
+                    self._ip_ban_list = pickle.load(f)
+            except Exception as e:
+                self.app.logger.exception('error reading persistence file {}. {}'.format(self._persist_file_name, e))
 
     def after_request(self, response):
         if response.status_code == 404:
@@ -76,13 +100,10 @@ class IpBan:
             if entry:
                 entry['timestamp'] = datetime.utcnow()
                 entry['count'] = self.ban_count * 2
-            else:
-                self._ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=self.ban_count * 2)
-
-            if permanent:
-                # ban for about 38 years
-                entry = self._ip_ban_list[ip]
                 entry['permanent'] = True
+            else:
+                self._ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=self.ban_count * 2, permanent=permanent)
+            self._persist_write()
             self.app.logger.info('{ip} added to ban list.'.format(ip=ip))
         return len(self._ip_ban_list)
 
@@ -128,10 +149,12 @@ class IpBan:
             if delta.seconds < self.ban_seconds or self.ban_seconds == 0:
                 self.app.logger.warning('IP is in ban list {}.  Url: {}'.format(ip, url))
                 entry['timestamp'] = datetime.utcnow()
+                self._persist_write()
                 abort(403)
             else:
                 self.app.logger.warning('IP expired from ban list {}.  Url: {}'.format(ip, url))
                 self._ip_ban_list[ip]['count'] = 0
+                self._persist_write()
 
     def ip_whitelist_add(self, ip):
         """
@@ -240,6 +263,7 @@ class IpBan:
             self._ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=1, url=url)
             entry = self._ip_ban_list[ip]
 
+        self._persist_write()
         self.app.logger.info(
             '{}. {} {} added/updated ban list. Count: {}'.format(reason, ip, url, entry['count']))
         return True

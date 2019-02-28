@@ -27,7 +27,7 @@ Install via `pip <https://pypi.python.org/pypi/pip>`_:
 
     pip install flask-ipban
 
-After installing, wrap your Flask app with a ``IpBan``:
+After installing, wrap your Flask app with an ``IpBan``, or call ip_ban.init_app(app):
 
 .. code:: python
 
