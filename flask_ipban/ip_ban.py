@@ -16,7 +16,6 @@ import os
 import pickle
 import re
 import tempfile
-from urllib.parse import urlparse
 from datetime import datetime
 
 from flask import request, abort
@@ -108,14 +107,14 @@ class IpBan:
         return len(self._ip_ban_list)
 
     def test_pattern_blocklist(self, url):
-        query = urlparse(url)
+        query_path = url.split('?')[0]
         for pattern, item in self._url_blocklist_patterns.items():
 
-            if item['match_type'] == 'regex' and item['pattern'].match(query.path):
+            if item['match_type'] == 'regex' and item['pattern'].match(query_path):
                 self.app.logger.warning('Url {} matches block pattern {}'.format( url, pattern))
                 return True
 
-            if item['match_type'] == 'string' and pattern == query.path:
+            if item['match_type'] == 'string' and pattern == query_path:
                 self.app.logger.warning('Url {} matches block string {}'.format( url, pattern))
                 return True
         return False
