@@ -21,14 +21,14 @@ long_description = open('README.rst', 'r', encoding='utf-8').read()
 setup(
     name='flask-ipban',
 
-    version='0.1.5',
+    version='0.1.6',
 
     description='URL spam security for Flask.',
     long_description=open('README.rst','r',encoding='utf-8').read(),
     long_description_content_type='text/x-rst',
 
     url='https://github.com/Martlark/flask-ipban',
-    download_url='https://github.com/Martlark/flask-ipban/archive/0.1.4.tar.gz',
+    download_url='https://github.com/Martlark/flask-ipban/archive/0.1.6.tar.gz',
 
     author='Andrew Rowe',
     author_email='rowe.andrew.d@gmail.com',
@@ -36,7 +36,7 @@ setup(
     license='Apache Software License',
 
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production Stable',
 
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries :: Python Modules',
@@ -55,7 +55,7 @@ setup(
         'Operating System :: POSIX',
         'Operating System :: MacOS',
         'Operating System :: Unix',
-        'Operating System :: Windows',
+        'Operating System :: Microsoft :: Windows',
     ],
     keywords='flask security spam url ban',
 
