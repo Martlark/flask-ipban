@@ -100,7 +100,7 @@ class IpBan:
             if entry:
                 entry['timestamp'] = datetime.utcnow()
                 entry['count'] = self.ban_count * 2
-                entry['permanent'] = True
+                entry['permanent'] = permanent
             else:
                 self._ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=self.ban_count * 2, permanent=permanent)
             self._persist_write()
@@ -112,9 +112,11 @@ class IpBan:
         for pattern, item in self._url_blocklist_patterns.items():
 
             if item['match_type'] == 'regex' and item['pattern'].match(query.path):
+                self.app.logger.warning('Url {} matches block pattern {}'.format( url, pattern))
                 return True
 
             if item['match_type'] == 'string' and pattern == query.path:
+                self.app.logger.warning('Url {} matches block string {}'.format( url, pattern))
                 return True
         return False
 

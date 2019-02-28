@@ -91,6 +91,14 @@ class TestIpBan(unittest.TestCase):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
 
+    def testManualBlockTimeout(self):
+        self.ip_ban.block([localhost])
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 403)
+        time.sleep(self.ban_seconds + 1)
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+
     def testBlockPermanent(self):
         self.ip_ban.block([localhost], permanent=True)
         response = self.client.get('/')

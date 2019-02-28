@@ -19,15 +19,22 @@ from flask_ipban.ip_ban import IpBan
 app = Flask(__name__)
 
 ban_count = 5
+ban_seconds = 5
 
-ip_ban = IpBan(app=app, ban_count=ban_count, ban_seconds=5)
+ip_ban = IpBan(app=app, ban_count=ban_count, ban_seconds=ban_seconds)
+ip_ban.load_nuisances()
 ip_ban.url_pattern_add('/tmp/\\d*$')
 ip_ban.url_pattern_add('/whitelist/\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b$')
 
 
+@app.route('/hello')
+def hello():
+    return 'Hello there'
+
+
 @app.route('/')
 def index():
-    return render_template('index.html', title='Ip Ban sample app', ban_count=ban_count)
+    return render_template('index.html', title='Ip Ban sample app', ban_count=ban_count, ban_seconds=ban_seconds)
 
 
 @app.route('/block_it/<path:ip>')

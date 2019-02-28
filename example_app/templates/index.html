@@ -36,7 +36,7 @@
             <button onclick="controller.getIndex()">Test get</button>
         </td>
         <td>
-            Get the index page to test if banned
+            Get the hello page to test if banned.  Ban expires in {{ban_seconds}} seconds.
         </td>
     </tr>
     <tr>
@@ -87,6 +87,14 @@
         </td>
         <td>
             Removes this ip from the whitelist. Any existing ban will operate again.
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <button onclick="controller.getIndex('/manager/html')">Open nuisance url</button>
+        </td>
+        <td>
+            Will ban this ip immediately.
         </td>
     </tr>
     </tbody>
