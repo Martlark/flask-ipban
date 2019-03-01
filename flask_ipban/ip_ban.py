@@ -277,6 +277,13 @@ class IpBan:
         return True
 
     def load_nuisances(self, file_name=None):
+        """
+        load a file of nuisance urls that are commonly used by vulnerability scanners.
+        Once loaded any access to one of these urls that produces a 404 will ban the source ip.
+        Each call to load_nuisances will add to the current list of nuisances
+        :param file_name: a file name of your own nuisance ips
+        :return: the number of nuisances added from this file
+        """
         if not file_name:
             file_name = os.path.join(os.path.dirname(__file__), 'nuisance.txt')
 
