@@ -21,7 +21,7 @@ long_description = open('README.rst', 'r', encoding='utf-8').read()
 setup(
     name='flask-ipban',
 
-    version='0.1.8',
+    version='0.1.9',
 
     description='URL spam security for Flask.',
     long_description=open('README.rst','r',encoding='utf-8').read(),
@@ -60,6 +60,6 @@ setup(
     keywords='flask security spam url ban',
 
     packages=['flask_ipban'],
-
+    include_package_data=True,
     install_requires=['flask>=1.0.2'],
 )

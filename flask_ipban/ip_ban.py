@@ -19,6 +19,7 @@ import tempfile
 from datetime import datetime
 
 from flask import request, abort
+import logging
 
 
 class IpBan:
@@ -28,12 +29,12 @@ class IpBan:
 
     Optional config by env variable
     ======
-    IP_BAN_LIST_COUNT - number of entries before 403 exception
-    IP_BAN_LIST_SECONDS - number of minutes to retain memory of IP
+    IP_BAN_LIST_COUNT - number of observations before 403 exception
+    IP_BAN_LIST_SECONDS - number of seconds to retain memory of IP
 
     """
 
-    def __init__(self, app=None, ban_count=50, ban_seconds=3600, persist=False, persist_file_name=None):
+    def __init__(self, app=None, ban_count=20, ban_seconds=3600, persist=False, persist_file_name=None):
         """
         start
         :param app: (optional when using init_app) flask application with logger defined
@@ -52,6 +53,8 @@ class IpBan:
         if persist_file_name:
             self._persist_file_name = persist_file_name
 
+        self.logger = logging
+
         if app:
             self.init_app(app)
 
@@ -62,6 +65,7 @@ class IpBan:
         :return:
         """
         self.app = app
+        self.logger = app.logger
         self._persist_read()
         app.after_request(self.after_request)
         app.before_request(self.before_request_check)
@@ -72,7 +76,7 @@ class IpBan:
                 with open(self._persist_file_name, 'wb') as f:
                     pickle.dump(self._ip_ban_list, f, protocol=pickle.HIGHEST_PROTOCOL)
             except Exception as e:
-                self.app.logger.exception('error writing persistence file {}. {}'.format(self._persist_file_name, e))
+                self.logger.exception('error writing persistence file {}. {}'.format(self._persist_file_name, e))
 
     def _persist_read(self):
         if self._persist:
@@ -80,7 +84,7 @@ class IpBan:
                 with open(self._persist_file_name, 'rb') as f:
                     self._ip_ban_list = pickle.load(f)
             except Exception as e:
-                self.app.logger.exception('error reading persistence file {}. {}'.format(self._persist_file_name, e))
+                self.logger.exception('error reading persistence file {}. {}'.format(self._persist_file_name, e))
 
     def after_request(self, response):
         if response.status_code == 404:
@@ -103,7 +107,7 @@ class IpBan:
             else:
                 self._ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=self.ban_count * 2, permanent=permanent)
             self._persist_write()
-            self.app.logger.info('{ip} added to ban list.'.format(ip=ip))
+            self.logger.info('{ip} added to ban list.'.format(ip=ip))
         return len(self._ip_ban_list)
 
     def test_pattern_blocklist(self, url):
@@ -111,11 +115,11 @@ class IpBan:
         for pattern, item in self._url_blocklist_patterns.items():
 
             if item['match_type'] == 'regex' and item['pattern'].match(query_path):
-                self.app.logger.warning('Url {} matches block pattern {}'.format( url, pattern))
+                self.logger.warning('Url {} matches block pattern {}'.format(url, pattern))
                 return True
 
             if item['match_type'] == 'string' and pattern == query_path:
-                self.app.logger.warning('Url {} matches block string {}'.format( url, pattern))
+                self.logger.warning('Url {} matches block string {}'.format(url, pattern))
                 return True
         return False
 
@@ -133,13 +137,6 @@ class IpBan:
 
         entry = self._ip_ban_list.get(ip)
 
-        # check url block list if no existing entry
-        # or existing entry has expired
-        if not entry or (entry and entry.get('count', 0) == 0):
-            if self.test_pattern_blocklist(url):
-                self.block([ip])
-                abort(403)
-
         if entry and entry.get('count', 0) > self.ban_count:
             utc_now = datetime.utcnow()
             delta = utc_now - entry.get('timestamp', utc_now)
@@ -148,12 +145,12 @@ class IpBan:
                 abort(403)
 
             if delta.seconds < self.ban_seconds or self.ban_seconds == 0:
-                self.app.logger.warning('IP is in ban list {}.  Url: {}'.format(ip, url))
+                self.logger.warning('IP is in ban list {}.  Url: {}'.format(ip, url))
                 entry['timestamp'] = datetime.utcnow()
                 self._persist_write()
                 abort(403)
             else:
-                self.app.logger.warning('IP expired from ban list {}.  Url: {}'.format(ip, url))
+                self.logger.warning('IP expired from ban list {}.  Url: {}'.format(ip, url))
                 self._ip_ban_list[ip]['count'] = 0
                 self._persist_write()
 
@@ -177,13 +174,14 @@ class IpBan:
             return True
         return False
 
-    def url_pattern_add(self, url_pattern):
+    def url_pattern_add(self, url_pattern, match_type='regex'):
         """
         add or replace the pattern to the list of url patterns to ignore
         :param url_pattern: regex pattern to match with requested url
+        :param match_type: string or regex - determines the pattern matching scheme
         :return: length of the whitelist
         """
-        self._url_whitelist_patterns[url_pattern] = re.compile(url_pattern)
+        self._url_whitelist_patterns[url_pattern] = dict(pattern=re.compile(url_pattern), match_type=match_type)
         return len(self._url_whitelist_patterns)
 
     def url_pattern_remove(self, url_pattern):
@@ -230,8 +228,10 @@ class IpBan:
         if not url:
             url = request.environ.get('PATH_INFO')
 
-        for key, compiled in self._url_whitelist_patterns.items():
-            if compiled.match(url):
+        for key, item in self._url_whitelist_patterns.items():
+            if item['match_type'] == 'regex' and item['pattern'].match(url):
+                return True
+            elif item['match_type'] == 'string' and key == url:
                 return True
 
         if ip in self._ip_whitelist:
@@ -245,7 +245,7 @@ class IpBan:
         :param ip: optional ip to add
         :param url: optional url to display/store
         :param reason: optional reason for ban, default is 404
-        :return True if entry added
+        :return True if entry added/updated
         """
         if not ip:
             ip = request.environ.get('REMOTE_ADDR')
@@ -254,9 +254,16 @@ class IpBan:
             url = request.environ.get('PATH_INFO')
 
         if self._is_excluded(ip=ip, url=url):
-            return
+            return False
 
         entry = self._ip_ban_list.get(ip)
+        # check url block list if no existing entry
+        # or existing entry has expired
+        if not entry or (entry and entry.get('count', 0) < self.ban_count):
+            if self.test_pattern_blocklist(url):
+                self.block([ip])
+                return True
+
         if entry:
             entry['timestamp'] = datetime.utcnow()
             entry['count'] += 1
@@ -265,7 +272,7 @@ class IpBan:
             entry = self._ip_ban_list[ip]
 
         self._persist_write()
-        self.app.logger.info(
+        self.logger.info(
             '{}. {} {} added/updated ban list. Count: {}'.format(reason, ip, url, entry['count']))
         return True
 
@@ -292,5 +299,5 @@ class IpBan:
                             self.url_block_pattern_add(line, match_type)
                             added_count += 1
                         except Exception as e:
-                            self.app.logger.warning('line {}. Exception adding pattern {}'.format(line_count, str(e)))
+                            self.logger.warning('line {}. Exception adding pattern {}'.format(line_count, str(e)))
         return added_count

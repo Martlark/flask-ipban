@@ -41,7 +41,6 @@ class TestIpBan(unittest.TestCase):
         self.client = self.app.test_client()
 
         self.app.route('/')(hello_world)
-        self.app.route('/good/<int:parameter>')(hello_world)
 
     def testAddRemoveIpWhitelist(self):
         self.assertEqual(self.ip_ban.ip_whitelist_add(localhost), 1)
@@ -75,6 +74,16 @@ class TestIpBan(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
 
         self.assertFalse(self.ip_ban.url_pattern_remove(localhost))
+
+    def testUrlWhitelistString(self):
+        test_url = '/no_exist'
+
+        self.assertEqual(self.ip_ban.url_pattern_add(test_url, 'string'), 1)
+        for x in range(self.ip_ban.ban_count * 2):
+            response = self.client.get('{}?{}'.format(test_url, x))
+            self.assertEqual(response.status_code, 404)
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
 
     def testBlock(self):
         self.assertEqual(self.ip_ban.block([localhost, '123.1.1.3']), 2)
@@ -131,36 +140,51 @@ class TestIpBan(unittest.TestCase):
             self.assertEqual(response.status_code, 403)
 
     def testAddRemoveUrlBlocklist(self):
-        test_pattern = '^/good/[0-9]+$'
-        test_url = '/good'
+        test_pattern = '^/bad/[0-9]+$'
+        test_url = '/bad'
+
+        self.app.route('/good/<int:parameter>')(hello_world)
+
         self.assertTrue(re.match(test_pattern, test_url + '/123'))
         self.assertFalse(re.match(test_pattern, test_url))
 
         # no block
-        response = self.client.get('{}/{}'.format(test_url, 456))
+        response = self.client.get('/good/{}'.format(456))
         self.assertEqual(response.status_code, 200)
 
-        # getting index page is blocked after block url get
+        # getting index page is blocked after block 404 url get
         self.assertEqual(self.ip_ban.url_block_pattern_add(test_pattern), 1)
         response = self.client.get('{}/{}'.format(test_url, 123))
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
+        # should now be banned
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
 
-        # ban remains even after timeout
+        # ban removed after timeout
         time.sleep(self.ban_seconds + 1)
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         response = self.client.get('{}/{}'.format(test_url, 123))
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
 
         # ban remains even after pattern removed
+        # caused by previous 404
         self.assertTrue(self.ip_ban.url_block_pattern_remove(test_pattern))
-        response = self.client.get('{}/{}'.format(test_url, 200))
+        response = self.client.get('{}/{}'.format(test_url, 456))
         self.assertEqual(response.status_code, 403)
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
 
+        # ban removed after timeout
+        time.sleep(self.ban_seconds + 1)
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get('{}/{}'.format(test_url, 123))
+        self.assertEqual(response.status_code, 404)
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+
+        # already removed
         self.assertFalse(self.ip_ban.url_block_pattern_remove(localhost))
 
     def testLoadNuisances(self):
@@ -182,10 +206,14 @@ class TestIpBan(unittest.TestCase):
         for e in ['/admin/assets/js/views/login.js', '/vip163mx00.mxmail.netease.com:25', '/manager/html']:
             self.assertTrue(self.ip_ban.test_pattern_blocklist(e), e)
 
+        # test real blocking
         e = 'jsp'
         response = self.client.get('/regextest/page.{}'.format(e))
-        self.assertEqual(response.status_code, 403, e)
-        # this ip is no blocked
+        self.assertEqual(response.status_code, 200, e)
+        # goto 404
+        response = self.client.get('/doesnotexist/page.{}'.format(e))
+        self.assertEqual(response.status_code, 404, e)
+        # this ip is now blocked
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
 

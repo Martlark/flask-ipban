@@ -3,6 +3,7 @@
 # https://medium.com/@joel.barmettler/how-to-upload-your-python-package-to-pypi-65edc5fe9c56
 # https://pypi.org/project/twine/
 #
+# https://python-packaging.readthedocs.io/en/latest/non-code-files.html
 # edit setup.py
 # to update the version
 
@@ -18,10 +19,10 @@ pip install twine
 
 python3 setup.py sdist bdist_wheel
 #
-twine check dist/flask_ipban-0.1.7*
+twine check dist/flask_ipban-0.1.9*
 # test
-twine upload --repository-url https://test.pypi.org/legacy/ dist/* -u martlark
+# twine upload --repository-url https://test.pypi.org/legacy/ dist/* -u martlark
 # prod pypi
 # add release in git hub to match the version
-twine upload dist/flask_ipban-0.1.7-py2.py3-none-any.whl -u martlark
+twine upload dist/flask_ipban-0.1.9-py2.py3-none-any.whl -u martlark
 
