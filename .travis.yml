@@ -3,9 +3,9 @@ sudo: false
 
 matrix:
   include:
-  - python: 3.6
+  - python: 3.7
     env: TOXENV=lint
-  - python: 3.6
+  - python: 2.7
     env: TOXENV=py27
   - python: 3.4
     env: TOXENV=py34

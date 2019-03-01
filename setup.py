@@ -21,14 +21,14 @@ long_description = open('README.rst', 'r', encoding='utf-8').read()
 setup(
     name='flask-ipban',
 
-    version='0.2.0',
+    version='0.2.1',
 
     description='URL spam security for Flask.',
     long_description=open('README.rst','r',encoding='utf-8').read(),
     long_description_content_type='text/x-rst',
 
     url='https://github.com/Martlark/flask-ipban',
-    download_url='https://github.com/Martlark/flask-ipban/archive/0.2.0.tar.gz',
+    download_url='https://github.com/Martlark/flask-ipban/archive/0.2.1.tar.gz',
 
     author='Andrew Rowe',
     author_email='rowe.andrew.d@gmail.com',
@@ -61,5 +61,5 @@ setup(
 
     packages=['flask_ipban'],
     include_package_data=True,
-    install_requires=['flask>=1.0.2'],
+    install_requires=['flask>=0.11'],
 )
