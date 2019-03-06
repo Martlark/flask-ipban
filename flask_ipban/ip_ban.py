@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import pickle
 import re
 import tempfile
 from datetime import datetime
 
+import yaml
 from flask import request, abort
-import logging
 
 
 class IpBan:
@@ -110,17 +111,20 @@ class IpBan:
             self.logger.info('{ip} added to ban list.'.format(ip=ip))
         return len(self._ip_ban_list)
 
-    def test_pattern_blocklist(self, url):
+    def test_pattern_blocklist(self, url, ip=None):
         query_path = url.split('?')[0]
         for pattern, item in self._url_blocklist_patterns.items():
 
             if item['match_type'] == 'regex' and item['pattern'].match(query_path):
                 self.logger.warning('Url {} matches block pattern {}'.format(url, pattern))
                 return True
-
-            if item['match_type'] == 'string' and pattern == query_path:
+            elif item['match_type'] == 'string' and pattern == query_path:
                 self.logger.warning('Url {} matches block string {}'.format(url, pattern))
                 return True
+            elif ip and item['match_type'] == 'ip' and pattern == ip:
+                self.logger.warning('ip block match {}'.format(ip))
+                return True
+
         return False
 
     def before_request_check(self):
@@ -260,7 +264,7 @@ class IpBan:
         # check url block list if no existing entry
         # or existing entry has expired
         if not entry or (entry and entry.get('count', 0) < self.ban_count):
-            if self.test_pattern_blocklist(url):
+            if self.test_pattern_blocklist(url, ip=ip):
                 self.block([ip])
                 return True
 
@@ -278,33 +282,26 @@ class IpBan:
 
     def load_nuisances(self, file_name=None):
         """
-        load a file of nuisance urls that are commonly used by vulnerability scanners.
+        load a yaml file of nuisance urls that are commonly used by vulnerability scanners.
         Once loaded any access to one of these urls that produces a 404 will ban the source ip.
         Each call to load_nuisances will add to the current list of nuisances
         :param file_name: a file name of your own nuisance ips
         :return: the number of nuisances added from this file
         """
         if not file_name:
-            file_name = os.path.join(os.path.dirname(__file__), 'nuisance.txt')
+            file_name = os.path.join(os.path.dirname(__file__), 'nuisance.yaml')
 
         added_count = 0
-        line_count = 0
-        match_type = 'regex'
         with open(file_name) as f:
-            for line in f:
-                line_count += 1
-                line = line.strip()
-                if line.startswith('#') or len(line) < 3:
-                    pass  # comment or not long enough
-                else:
-                    if line == '==regex==':
-                        match_type = 'regex'
-                    elif line == '==string==':
-                        match_type = 'string'
-                    else:
-                        try:
-                            self.url_block_pattern_add(line, match_type)
-                            added_count += 1
-                        except Exception as e:
-                            self.logger.warning('line {}. Exception adding pattern {}'.format(line_count, str(e)))
+            y = yaml.load(f)
+
+            for match_type in ['ip', 'string', 'regex']:
+                for value in y[match_type]:
+                    try:
+                        self.url_block_pattern_add(value, match_type)
+                        added_count += 1
+                    except Exception as e:
+                        self.logger.warning(
+                            'Exception {exception} adding pattern {value}'.format(value=value, exception=str(e)))
+
         return added_count

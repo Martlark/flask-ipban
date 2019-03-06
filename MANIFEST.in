@@ -1,1 +1,1 @@
-include flask_ipban/nuisance.txt
+include flask_ipban/nuisance.yaml

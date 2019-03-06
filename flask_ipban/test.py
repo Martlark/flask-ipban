@@ -204,6 +204,11 @@ class TestIpBan(unittest.TestCase):
         for e in ['/admin/assets/js/views/login.js', '/vip163mx00.mxmail.netease.com:25', '/manager/html']:
             self.assertTrue(self.ip_ban.test_pattern_blocklist(e), e)
 
+        # test blocked ip
+        for e in ['185.53.91.24']:
+            self.assertTrue(self.ip_ban.test_pattern_blocklist(e, ip=e), e)
+
+        self.assertFalse(self.ip_ban.test_pattern_blocklist(e, ip='127.0.0.1'), e)
         # test real blocking
         e = 'jsp'
         response = self.client.get('/regextest/page.{}'.format(e))

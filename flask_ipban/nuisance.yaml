@@ -1,0 +1,78 @@
+# Copyright 2019 Andrew Rowe.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# some common nuisances that should be blocked in a flask app
+# updated: 28-02-2019
+#
+# format:
+#
+# is in yaml.
+# regex - match by pattern.
+# string - direct match.
+# ip - block any ip that matches.
+#
+# url strings are stripped of any parameters before checking
+#
+# php, java, .net etal should not be handled by flask
+
+regex:
+  - .*\.action$
+  - .*\.asp$
+  - .*\.aspx$
+  - .*\.asx$
+  - .*\.cfm$
+  - .*\.cgi$
+  - .*\.do$
+  - .*\.env$
+  - .*\.jsp$
+  - .*\.jspx$
+  - .*\.nsf$
+  - .*\.php$
+  - .*\.wss$
+  # hacking attempts
+  - .*/a2billing/.*
+  - .*?PHPSESSID=
+  - .*\/usage_201811$
+  - .*\/usage_201811.html$
+  - .*\/wp-admin\/$
+  - .*netease\.com\:25$
+
+string:
+  # all of these are hacking attempts by vulnerability scanners
+  - /.git/config
+  - /_asterisk/
+  - /admin/assets/js/views/login.js
+  - /admin/images/cal_date_over.gif
+  - /api/v1/pods
+  - /bea_wls_deployment_internal
+  - /HNAP1/
+  - /index.php/admin/
+  - /joomla/
+  - /libs/js/iframe.js
+  - /manager/html
+  - /muieblackcat
+  - /myadmin/
+  - /mysqladmin/
+  - /phpmyadmin/
+  - /phpmyadmin/
+  - /phpmyadmin0/
+  - /pma/
+  - /sftp-config.json
+  - /sql/
+  - /temp/wp-admin/
+  - /templates/system/css/system.css
+  - /wp-content/plugins/image-clipboard/readme.txt
+
+ip:
+  - 185.53.91.24
