@@ -219,3 +219,14 @@ class TestIpBan(unittest.TestCase):
         # this ip is now blocked
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
+
+    def test_remove(self):
+        self.ip_ban.block(['100.200.300.400'])
+        self.assertFalse(self.ip_ban.remove('1.2.3.4'))
+        self.assertTrue(self.ip_ban.remove('100.200.300.400'))
+        self.ip_ban.block([localhost])
+        response = self.client.get('/')
+        self.assertEqual(403, response.status_code)
+        self.assertTrue(self.ip_ban.remove(localhost))
+        response = self.client.get('/')
+        self.assertEqual(200, response.status_code)

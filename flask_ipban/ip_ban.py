@@ -280,6 +280,20 @@ class IpBan:
             '{}. {} {} added/updated ban list. Count: {}'.format(reason, ip, url, entry['count']))
         return True
 
+    def remove(self, ip):
+        """
+        remove from the ban list
+        :param ip: ip to remove
+        :return True if entry removed
+        """
+
+        entry = self._ip_ban_list.get(ip)
+        if not entry:
+            return False
+
+        del self._ip_ban_list[ip]
+        return True
+
     def load_nuisances(self, file_name=None):
         """
         load a yaml file of nuisance urls that are commonly used by vulnerability scanners.

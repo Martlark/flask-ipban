@@ -1,2 +1,2 @@
 flask>=1.0.2
-flask-ipban>=0.1.9
+flask-ipban>=0.2.0
