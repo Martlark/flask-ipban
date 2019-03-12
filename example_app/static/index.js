@@ -45,7 +45,7 @@ class View {
 
     addIt() {
         fetch(`/add_it`).then(response => {
-            this.showResult(response);
+            View.showResult(response);
         }).catch(err => {
             View.setMessage(`Error: ${err}`);
         })

@@ -64,7 +64,8 @@ Methods
 -------
 
 -  ``block(ip_address, permanent=False)`` - block the specific address optionally forever
--  ``add(reason='404')`` - increase the observations for the current request ip
+-  ``add(ip=None, url=None, reason='404')`` - increase the observations for the current request ip or given ip address
+-  ``remove(ip_address)`` - remove the given ip address from the ban list.  Returns true if ban removed.
 -  ``url_pattern_add('reg-ex-pattern', match_type='regex')`` - exclude any url matching the pattern from checking
 -  ``url_pattern_remove('reg-ex-pattern')`` - remove pattern from the url whitelist
 -  ``url_block_pattern_add('reg-ex-pattern', match_type='regex')`` - add any url matching the pattern to the block list. match_type can be 'string' or 'regex'.  String is direct match.  Regex is a regex pattern.

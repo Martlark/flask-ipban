@@ -48,13 +48,13 @@ class IpBan:
         self._url_blocklist_patterns = {}
         self.ban_count = int(os.environ.get('IP_BAN_LIST_COUNT', ban_count))
         self.ban_seconds = int(os.environ.get('IP_BAN_LIST_SECONDS', ban_seconds))
-        self.app = None
+        self._app = None
         self._persist = persist
         self._persist_file_name = os.path.join(tempfile.gettempdir(), 'flask-ip-ban-persistence.pickle')
         if persist_file_name:
             self._persist_file_name = persist_file_name
 
-        self.logger = logging
+        self._logger = logging
 
         if app:
             self.init_app(app)
@@ -65,11 +65,11 @@ class IpBan:
         :param app: flask app with logger defined
         :return:
         """
-        self.app = app
-        self.logger = app.logger
+        self._app = app
+        self._logger = app.logger
         self._persist_read()
-        app.after_request(self.after_request)
-        app.before_request(self.before_request_check)
+        app.after_request(self._after_request)
+        app.before_request(self._before_request_check)
 
     def _persist_write(self):
         if self._persist:
@@ -77,7 +77,7 @@ class IpBan:
                 with open(self._persist_file_name, 'wb') as f:
                     pickle.dump(self._ip_ban_list, f, protocol=pickle.HIGHEST_PROTOCOL)
             except Exception as e:
-                self.logger.exception('error writing persistence file {}. {}'.format(self._persist_file_name, e))
+                self._logger.exception('error writing persistence file {}. {}'.format(self._persist_file_name, e))
 
     def _persist_read(self):
         if self._persist:
@@ -85,9 +85,9 @@ class IpBan:
                 with open(self._persist_file_name, 'rb') as f:
                     self._ip_ban_list = pickle.load(f)
             except Exception as e:
-                self.logger.exception('error reading persistence file {}. {}'.format(self._persist_file_name, e))
+                self._logger.exception('error reading persistence file {}. {}'.format(self._persist_file_name, e))
 
-    def after_request(self, response):
+    def _after_request(self, response):
         if response.status_code == 404:
             self.add()
         return response
@@ -108,7 +108,7 @@ class IpBan:
             else:
                 self._ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=self.ban_count * 2, permanent=permanent)
             self._persist_write()
-            self.logger.info('{ip} added to ban list.'.format(ip=ip))
+            self._logger.info('{ip} added to ban list.'.format(ip=ip))
         return len(self._ip_ban_list)
 
     def test_pattern_blocklist(self, url, ip=None):
@@ -116,18 +116,18 @@ class IpBan:
         for pattern, item in self._url_blocklist_patterns.items():
 
             if item['match_type'] == 'regex' and item['pattern'].match(query_path):
-                self.logger.warning('Url {} matches block pattern {}'.format(url, pattern))
+                self._logger.warning('Url {} matches block pattern {}'.format(url, pattern))
                 return True
             elif item['match_type'] == 'string' and pattern == query_path:
-                self.logger.warning('Url {} matches block string {}'.format(url, pattern))
+                self._logger.warning('Url {} matches block string {}'.format(url, pattern))
                 return True
             elif ip and item['match_type'] == 'ip' and pattern == ip:
-                self.logger.warning('ip block match {}'.format(ip))
+                self._logger.warning('ip block match {}'.format(ip))
                 return True
 
         return False
 
-    def before_request_check(self):
+    def _before_request_check(self):
         """
         raise 403 exception if ip in request has made too many 404 or failed login attempts
         checks url, blocklist and ip lists
@@ -149,12 +149,12 @@ class IpBan:
                 abort(403)
 
             if delta.seconds < self.ban_seconds or self.ban_seconds == 0:
-                self.logger.warning('IP is in ban list {}.  Url: {}'.format(ip, url))
+                self._logger.warning('IP is in ban list {}.  Url: {}'.format(ip, url))
                 entry['timestamp'] = datetime.utcnow()
                 self._persist_write()
                 abort(403)
             else:
-                self.logger.warning('IP expired from ban list {}.  Url: {}'.format(ip, url))
+                self._logger.warning('IP expired from ban list {}.  Url: {}'.format(ip, url))
                 self._ip_ban_list[ip]['count'] = 0
                 self._persist_write()
 
@@ -276,7 +276,7 @@ class IpBan:
             entry = self._ip_ban_list[ip]
 
         self._persist_write()
-        self.logger.info(
+        self._logger.info(
             '{}. {} {} added/updated ban list. Count: {}'.format(reason, ip, url, entry['count']))
         return True
 
@@ -315,7 +315,7 @@ class IpBan:
                         self.url_block_pattern_add(value, match_type)
                         added_count += 1
                     except Exception as e:
-                        self.logger.warning(
+                        self._logger.warning(
                             'Exception {exception} adding pattern {value}'.format(value=value, exception=str(e)))
 
         return added_count
