@@ -41,7 +41,7 @@ After installing, wrap your Flask app with an ``IpBan``, or call ip_ban.init_app
     IpBan(app, ban_seconds=200)
 
 
-The repository includes a small example application
+The repository includes a small example application.
 
 Options
 -------
@@ -65,17 +65,8 @@ Methods
 
 -  ``block(ip_address, permanent=False)`` - block the specific address optionally forever
 -  ``add(ip=None, url=None, reason='404')`` - increase the observations for the current request ip or given ip address
--  ``remove(ip_address)`` - remove the given ip address from the ban list.  Returns true if ban removed.
--  ``url_pattern_add('reg-ex-pattern', match_type='regex')`` - exclude any url matching the pattern from checking
--  ``url_pattern_remove('reg-ex-pattern')`` - remove pattern from the url whitelist
--  ``url_block_pattern_add('reg-ex-pattern', match_type='regex')`` - add any url matching the pattern to the block list. match_type can be 'string' or 'regex'.  String is direct match.  Regex is a regex pattern.
--  ``url_block_pattern_remove('reg-ex-pattern')`` - remove pattern from the url block list
--  ``ip_whitelist_add('ip-address')`` - exclude the given ip from checking
--  ``ip_whitelist_remove('ip-address')`` - remove the given ip from the ip whitelist
--  ``load_nuisances(file_name=None)`` - add a list of nuisances to url pattern block list from a file.  See below for more information.
 
-
-Example whitelist code
+Example for add:
 
 .. code:: python
 
@@ -84,16 +75,63 @@ Example whitelist code
 
     app = Flask(__name__)
     ip_ban = IpBan(app)
-    ip_ban.url_pattern_add('^/whitelist$')
 
-    @app.route('/normal')
-    def normal():
-        return 'Normal'
+    @route('/login', methods=['GET','POST']
+    def login:
+        # ....
+        # increment block if wrong passwords to prevent password stuffing
+        # ....
+        if request.method == 'POST':
+            if request.arg.get('password') != 'secret':
+                ip_ban.add(reason='bad password')
 
-    @app.route('/whitelist')
-    def whitelist():
-        parameter_value = request.args.get('parameter')
-        return 'whitelist ' + parameter_value
+-  ``remove(ip_address)`` - remove the given ip address from the ban list.  Returns true if ban removed.
+-  ``url_pattern_add('reg-ex-pattern', match_type='regex')`` - exclude any url matching the pattern from checking
+
+
+Example of url_pattern_add:
+
+.. code:: python
+
+    from flask import Flask
+    from flask_ipban import IpBan
+
+    app = Flask(__name__)
+    ip_ban = IpBan(app)
+    ip_ban.url_pattern_add('^/whitelist$', match_type='regex')
+    ip_ban.url_pattern_add('/flash/dance', match_type='string')
+
+
+-  ``url_pattern_remove('reg-ex-pattern')`` - remove pattern from the url whitelist
+-  ``url_block_pattern_add('reg-ex-pattern', match_type='regex')`` - add any url matching the pattern to the block list. match_type can be 'string' or 'regex'.  String is direct match.  Regex is a regex pattern.
+-  ``url_block_pattern_remove('reg-ex-pattern')`` - remove pattern from the url block list
+-  ``ip_whitelist_add('ip-address')`` - exclude the given ip from checking
+-  ``ip_whitelist_remove('ip-address')`` - remove the given ip from the ip whitelist
+
+
+Example of ip_whitelist_add
+
+.. code:: python
+
+    from flask import Flask
+    from flask_ipban import IpBan
+
+    app = Flask(__name__)
+    ip_ban = IpBan(app)
+    ip_ban.whitelist-add('127.0.0.1')
+
+
+-  ``load_nuisances(file_name=None)`` - add a list of nuisances to url pattern block list from a file.  See below for more information.
+
+Example:
+
+.. code:: python
+
+    ip_ban = IpBan()
+    app = Flask(__name__)
+    ip_ban.init_app(app)
+    ip_ban.load_nuisances()
+
 
 Url patterns
 ------------
@@ -113,9 +151,9 @@ that use nuisance url patterns they won't result in a block.
 
 Load them by calling ip_ban.load_nuisances()
 
-You can add your own nuisance file by calling with the parameter file_name=.
+You can add your own nuisance yaml file by calling with the parameter file_name=.
 
-See the nuisance.txt file in the source for formatting and details.
+See the nuisance.yaml file in the source for formatting and details.
 
 Licensing
 ---------

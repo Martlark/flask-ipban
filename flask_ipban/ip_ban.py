@@ -25,8 +25,9 @@ from flask import request, abort
 
 class IpBan:
     """
-    implements a simple list of ip addresses that
-    seem to be trying credential stuffing.
+    Implements a simple list of ip addresses that
+    seem to be trying credential stuffing.  Blocks items from that list
+    once they exceed the ban count.
 
     Optional config by env variable
     ======
@@ -112,6 +113,12 @@ class IpBan:
         return len(self._ip_ban_list)
 
     def test_pattern_blocklist(self, url, ip=None):
+        """
+        return true if the url or ip pattern matches an existing block
+        :param url: the url to check
+        :param ip: (optional) an ip to check
+        :return:
+        """
         query_path = url.split('?')[0]
         for pattern, item in self._url_blocklist_patterns.items():
 
