@@ -314,7 +314,7 @@ class IpBan:
 
         added_count = 0
         with open(file_name) as f:
-            y = yaml.load(f)
+            y = yaml.load(f, Loader=yaml.SafeLoader)
 
             for match_type in ['ip', 'string', 'regex']:
                 for value in y[match_type]:
