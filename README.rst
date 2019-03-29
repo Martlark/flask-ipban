@@ -49,7 +49,8 @@ Options
 -  ``ban_count``, default ``20``, Number of observations before banning
 -  ``ban_seconds``, default ``60``, Number of seconds ip address is banned
 -  ``persist``, default ``False``, Persist, by the use of a file in the tmp folder, the ip ban list.
--  ``persist_file_name``, default ``None``, Override the name of the persistence file.
+-  ``report_dir``, default ``None``, Override the location of persistence and report files.
+-  ``ipc``, default ``True``, Allow multiple instances of ip_ban to cross communicate using the ``report_dir``
 
 Config by env variable overrides options
 ########################################
