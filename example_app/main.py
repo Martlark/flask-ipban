@@ -25,6 +25,7 @@ ip_ban = IpBan(app=app, ban_count=ban_count, ban_seconds=ban_seconds)
 ip_ban.load_nuisances()
 ip_ban.url_pattern_add('/tmp/\\d*$')
 ip_ban.url_pattern_add('/whitelist/\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b$')
+ip_ban.url_pattern_add('/un_block_it/\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b$')
 
 
 @app.route('/hello')
@@ -40,6 +41,12 @@ def index():
 @app.route('/block_it/<path:ip>')
 def block_it(ip):
     ip_ban.block([ip])
+    return 'ok'
+
+
+@app.route('/un_block_it/<path:ip>')
+def un_block_it(ip):
+    ip_ban.remove(ip)
     return 'ok'
 
 

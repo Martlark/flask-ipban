@@ -97,9 +97,35 @@
             Will ban this ip immediately.
         </td>
     </tr>
+    <tr>
+        <td>
+            <button onclick="controller.getIndex('/un_block_it/127.0.0.1')">Unblock 127.0.0.1</button>
+        </td>
+        <td>
+            Will remove any block.
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <button onclick="controller.intervalStart()">Start Interval</button>
+            <p id="interval_status"></p>
+        </td>
+        <td>
+            Exercises IP BAN
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <button onclick="controller.intervalStop()">Stop Interval</button>
+        </td>
+        <td>
+            Stop IP BAN Exercises.
+        </td>
+    </tr>
     </tbody>
 </table>
-
+<input type="hidden" name="ban_count" value="{{ ban_count }}">
+<input type="hidden" name="ban_seconds" value="{{ ban_seconds }}">
 
 </body>
 </html>

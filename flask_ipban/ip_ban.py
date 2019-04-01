@@ -13,11 +13,11 @@
 # limitations under the License.
 
 import logging
+import operator
 import os
 import random
 import re
 import tempfile
-import threading
 from datetime import datetime
 
 import yaml
@@ -59,8 +59,8 @@ class IpBan:
         self._persist = persist  # type: bool
         self._ipc = ipc  # type: bool
         self._ip_record_dir = record_dir or os.path.join(tempfile.gettempdir(), 'flask-ip-ban')  # type: str
-        self._ip_record_timer_seconds = 5.0  # type: float
-        self._last_updatetime = datetime.now()
+        self._ip_record_timer_seconds = min(5.0, ban_seconds / 4)  # type: float
+        self._last_update_time = datetime.now()
         self._logger = logging
 
         if app:
@@ -80,7 +80,7 @@ class IpBan:
 
     def ip_record_clean(self):
         """
-        clean out old ip record file
+        clean out all ip record files
         :return: None
         """
         for f in os.listdir(self._ip_record_dir):
@@ -91,18 +91,25 @@ class IpBan:
             except:
                 pass
 
-    def _ip_record_timer_func(self):
+    def _ip_record_update_from_other_instances(self):
         """
-        timer func to start and restart IPC update method
+        Read updates from other instances every now and then
         """
         if not self._ipc:
             return
 
-        self._ip_record_read_updates()
-        self._ip_record_timer = threading.Timer(self._ip_record_timer_seconds, self._ip_record_timer_func)
-        self._ip_record_timer.start()
+        elapsed = datetime.now() - self._last_update_time
+        if elapsed.seconds > self._ip_record_timer_seconds:
+            self._ip_record_read_updates()
 
     def _ip_record_write(self, ip, record_type='add', count=0):
+        """
+        write a ip record into the store
+        :param ip: the ip to add
+        :param record_type: type of record, could be: add (default), permanent, block, remove, test
+        :param count: the list count of the add - allows adds to be communicated
+        :return:the file_name of the record or None if nothing going on
+        """
         if not self._ipc and not self._persist:
             return
 
@@ -113,23 +120,34 @@ class IpBan:
         else:
             with open(file_name, 'w') as f:
                 f.write(ip)
+        return file_name
 
     def _ip_record_setup(self):
         """
         setup the ip record db and start IPC timer
-        :return:
+        if store cannot be setup then ipc will be disabled.
+        :return: True if setup correctly.
         """
-        if not os.path.isdir(self._ip_record_dir):
-            os.makedirs(self._ip_record_dir)
+        if not self._ipc and not self._persist:
+            return False
 
-        if self._persist:
-            self._ip_record_read_updates(force=True)
-        else:
-            self.ip_record_clean()
+        try:
+            if not os.path.isdir(self._ip_record_dir):
+                os.makedirs(self._ip_record_dir)
 
-        if self._ipc:
-            self._ip_record_timer = threading.Timer(self._ip_record_timer_seconds, self._ip_record_timer_func)
-            self._ip_record_timer.start()
+            test_file_name = self._ip_record_write('test', 'test')
+            os.unlink(test_file_name)
+            if self._persist:
+                self._ip_record_read_updates(force=True)
+            else:
+                self.ip_record_clean()
+        except Exception as e:
+            self._logger.exception(e)
+            self._logger.error('ip record store cannot be established.  Disabling primitive IPC.')
+            self._ipc = False
+            return False
+
+        return True
 
     def _ip_record_remove(self, ip, record_types):
         """
@@ -155,37 +173,55 @@ class IpBan:
     def _ip_record_read_updates(self, force=False):
         """
         Read other process and persistence ip records.  Only reads records that are newer than previous run.
-        :param force: force update
+        When not persisting older records will be cleaned up when > 2*ban_seconds old
+        updates the _last_update_time on exit
+        :param force: force update from older records
         :return:
         """
         if not self._ipc and not self._persist:
             return
 
-        # self._logger.warning('Reading ip record updates')
-        for filename in os.listdir(self._ip_record_dir):
+        # read records and process from oldest to youngest
+        filename_list = [dict(filename=f, full_name=os.path.join(self._ip_record_dir, f),
+                              mtime=datetime.fromtimestamp(os.path.getmtime(os.path.join(self._ip_record_dir, f)))) for
+                         f in os.listdir(self._ip_record_dir)]
+        filename_list = sorted(filename_list, key=operator.itemgetter('mtime'))
+        for filename_entry in filename_list:
             try:
-                full_name = os.path.join(self._ip_record_dir, filename)
+                filename = filename_entry['filename']
                 if not filename.startswith(self._instance_id + '-'):
-                    if os.path.isfile(full_name):
-                        mtime = datetime.fromtimestamp(os.path.getmtime(full_name))
-                        if mtime > self._last_updatetime or force:
-                            with open(full_name, 'r') as f:
+                    if os.path.isfile(filename_entry['full_name']):
+                        if filename_entry['mtime'] > self._last_update_time or force:
+                            with open(filename_entry['full_name'], 'r') as f:
                                 ip = f.readline()
-                                self._logger.warning('Reading ip {} from record {}'.format(ip, filename))
+                                self._logger.warning(
+                                    'Instance: {}, reading ip {} from record {}@{}'.format(self._instance_id, ip,
+                                                                                           filename, str(
+                                            filename_entry['mtime']).split('.')[0]))
                                 if filename.endswith('.add'):
-                                    self.add(ip, url=' ', no_write=True)
+                                    self.add(ip, url=' ', no_write=True, timestamp=filename_entry['mtime'])
                                 elif filename.endswith('.block'):
-                                    self.block([ip], no_write=True, timestamp=mtime)
+                                    self.block([ip], no_write=True, timestamp=filename_entry['mtime'])
+                                elif filename.endswith('.test'):
+                                    pass
                                 elif filename.endswith('.permanent'):
                                     self.block([ip], permanent=True, no_write=True)
                                 elif filename.endswith('.remove'):
                                     self.remove(ip, no_write=True)
                                     self._ip_record_remove(ip, record_types=['.block', '.permanent', '.add'])
                                 else:
-                                    raise Exception('unknown ip record type for file: {}'.format(filename))
+                                    raise Exception(
+                                        'Instance: {}, unknown ip record type for file: {}'.format(self._instance_id,
+                                                                                                   filename))
+                        elif not self._persist:
+                            # clean up old entries
+                            elapsed = datetime.now() - filename_entry['mtime']
+                            if elapsed.seconds > self.ban_seconds * 2:
+                                os.unlink(filename_entry['full_name'])
+
             except Exception as e:
                 self._logger.exception(e)
-        self._last_updatetime = datetime.now()
+        self._last_update_time = datetime.now()
 
     def _after_request(self, response):
         """
@@ -203,14 +239,14 @@ class IpBan:
         :param ip_list: list of ip addresses to block
         :param permanent: (optional) True=do not allow entries to expire
         :param no_write: do not write an _ip_record
-        :param timestamp; use this timestamp instead of utcnow()
+        :param timestamp; use this timestamp instead of now()
         :returns number of entries in the block list
         """
         if not isinstance(ip_list, list):
             ip_list = [ip_list]
 
         if not timestamp:
-            timestamp = datetime.utcnow()
+            timestamp = datetime.now()
 
         for ip in ip_list:
             entry = self._ip_ban_list.get(ip)
@@ -254,6 +290,8 @@ class IpBan:
         checks url, blocklist and ip lists
         """
 
+        self._ip_record_update_from_other_instances()
+
         if self._is_excluded():
             return
 
@@ -263,21 +301,21 @@ class IpBan:
         entry = self._ip_ban_list.get(ip)
 
         if entry and entry.get('count', 0) > self.ban_count:
-            utc_now = datetime.utcnow()
-            delta = utc_now - entry.get('timestamp', utc_now)
+            now = datetime.now()
+            delta = now - entry.get('timestamp', now)
 
             if entry.get('permanent', False):
                 abort(403)
 
             if delta.seconds < self.ban_seconds or self.ban_seconds == 0:
-                self._logger.warning('IP is in ban list {}.  Url: {}'.format(ip, url))
-                entry['timestamp'] = datetime.utcnow()
+                self._logger.warning('IP updated in ban list {}.  Url: {}'.format(ip, url))
+                entry['timestamp'] = datetime.now()
                 entry['count'] += 1
                 self._ip_record_write(ip, count=entry['count'])
                 abort(403)
             else:
                 self._logger.warning('IP expired from ban list {}.  Url: {}'.format(ip, url))
-                self._ip_ban_list[ip]['count'] = 0
+                entry['count'] = 0
 
     def ip_whitelist_add(self, ip):
         """
@@ -364,7 +402,7 @@ class IpBan:
 
         return False
 
-    def add(self, ip=None, url=None, reason='404', no_write=False):
+    def add(self, ip=None, url=None, reason='404', no_write=False, timestamp=None):
         """
         increment ban count ip of the current request in the banned list
         :return:
@@ -372,6 +410,7 @@ class IpBan:
         :param url: optional url to display/store
         :param reason: optional reason for ban, default is 404
         :param no_write: do not write out to record file
+        :param timestamp: entry time to set
         :return True if entry added/updated
         """
         if not ip:
@@ -393,12 +432,18 @@ class IpBan:
                     self._ip_record_write(ip)
                 return True
 
+        if timestamp and timestamp > datetime.now():
+            timestamp = datetime.now()
+
+        timestamp = timestamp or datetime.now()
+
         if entry:
-            entry['timestamp'] = datetime.utcnow()
             entry['count'] += 1
         else:
-            self._ip_ban_list[ip] = dict(timestamp=datetime.utcnow(), count=1, url=url)
+            self._ip_ban_list[ip] = dict(timestamp=timestamp, count=1, url=url)
             entry = self._ip_ban_list[ip]
+
+        entry['timestamp'] = timestamp
 
         self._logger.info(
             '{}. {} {} added/updated ban list. Count: {}'.format(reason, ip, url, entry['count']))
@@ -457,7 +502,7 @@ if __name__ == '__main__':
 
     app = Flask(__name__)
 
-    ip_ban = IpBan(app=app, ban_count=4, ban_seconds=20, persist=True,
+    ip_ban = IpBan(app=app, ban_count=4, ban_seconds=20, persist=False,
                    record_dir='/tmp/flask-ip-ban-test-app')
     ip_ban.url_pattern_add('/unblock', match_type='string')
     ip_ban.load_nuisances()
@@ -476,6 +521,7 @@ if __name__ == '__main__':
     def route_block_perm():
         ip_ban.block(['127.0.0.1'], permanent=True)
         return '<h1>You are now blocked</h1>'
+
 
     def route_unblock():
         ip_ban.remove('127.0.0.1')
