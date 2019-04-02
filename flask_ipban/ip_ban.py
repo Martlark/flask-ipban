@@ -526,6 +526,7 @@ if __name__ == '__main__':
 
     app = Flask(__name__)
 
+    app.secret_key = str('abscdefghijklj430urojfdshfdsoih')
     ip_ban = IpBan(app=app, ban_count=4, ban_seconds=20, persist=False,
                    record_dir='/tmp/flask-ip-ban-test-app')
     ip_ban.url_pattern_add('/unblock', match_type='string')
