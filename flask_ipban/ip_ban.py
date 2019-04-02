@@ -176,7 +176,7 @@ class IpBan:
         if not self._ipc and not self._persist:
             return
 
-        self._logger.info('Removing {} for records {}'.format(ip, record_types))
+        self._logger.debug('Removing {} for records {}'.format(ip, record_types))
         for filename in os.listdir(self._ip_record_dir):
             try:
                 full_name = os.path.join(self._ip_record_dir, filename)
@@ -212,7 +212,7 @@ class IpBan:
                             with open(filename_entry['full_name'], 'rb') as f:
                                 signed_ip = f.readline()
                                 ip = self._signer.unsign(signed_ip).decode('utf-8')
-                                self._logger.info(
+                                self._logger.debug(
                                     'Instance: {}, reading ip {} from record {}@{}'.format(self._instance_id, ip,
                                                                                            filename, str(
                                             filename_entry['mtime']).split('.')[0]))
@@ -328,13 +328,13 @@ class IpBan:
                 abort(403)
 
             if delta.seconds < self.ban_seconds or self.ban_seconds == 0:
-                self._logger.info('IP updated in ban list {}.  Url: {}'.format(ip, url))
+                self._logger.debug('IP updated in ban list {}.  Url: {}'.format(ip, url))
                 entry['timestamp'] = datetime.now()
                 entry['count'] += 1
                 self._ip_record_write(ip, count=entry['count'])
                 abort(403)
             else:
-                self._logger.info('IP expired from ban list {}.  Url: {}'.format(ip, url))
+                self._logger.debug('IP expired from ban list {}.  Url: {}'.format(ip, url))
                 entry['count'] = 0
 
     def ip_whitelist_add(self, ip):
