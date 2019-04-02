@@ -61,5 +61,5 @@ setup(
 
     packages=['flask_ipban'],
     include_package_data=True,
-    install_requires=['flask>=0.11','pyyaml'],
+    install_requires=['flask>=0.11','pyyaml', 'itsdangerous'],
 )

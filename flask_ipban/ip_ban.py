@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
+
 import operator
 import os
 import random
 import re
 import tempfile
 from datetime import datetime
+from itsdangerous import Signer
 
 import yaml
 from flask import Flask, request, abort
@@ -37,7 +38,8 @@ class IpBan:
 
     """
 
-    def __init__(self, app=None, ban_count=20, ban_seconds=3600, persist=False, record_dir=None, ipc=True):
+    def __init__(self, app=None, ban_count=20, ban_seconds=3600, persist=False, record_dir=None, ipc=True,
+                 secret_key=None):
         """
         start
         :param app: (optional when using init_app) flask application with logger defined
@@ -46,6 +48,7 @@ class IpBan:
         :param persist: (optional) persists the ban records between app starts by storing in a temp folder
         :param record_dir: (optional default is flask-ip-ban in the temp folder) a record directory that stores ban records for ipc sync and persistence.
         :param ipc: enable ipc communication
+        :param secret_key: optional secret key for signing ipc records.  Default is to use flask secret key
         """
         self.ban_count = int(os.environ.get('IP_BAN_LIST_COUNT', ban_count))  # type: int
         self.ban_seconds = int(os.environ.get('IP_BAN_LIST_SECONDS', ban_seconds))  # type: int
@@ -62,6 +65,7 @@ class IpBan:
         self._ip_record_timer_seconds = min(5.0, ban_seconds / 4)  # type: float
         self._last_update_time = datetime.now()
         self._logger = logging
+        self._secret_key = secret_key # type: str
 
         if app:
             self.init_app(app)
@@ -73,10 +77,24 @@ class IpBan:
         :return:
         """
         self._app = app
+        self._signer = Signer(self._secret_key or app.secret_key or app.config.get('SECRET_KEY') or 'not-very-secret-key')
         self._logger = app.logger
         self._ip_record_setup()
         app.after_request(self._after_request)
         app.before_request(self._before_request_check)
+
+    def safe_unlink(self, file_name):
+        """
+        safely remove a file if it exists.  only log if error
+        :param file_name:
+        :return:
+        """
+        try:
+            if os.path.isfile(file_name):
+                # attempt to remove the file
+                os.unlink(file_name)
+        except Exception as ex:
+            self._logger.exception(ex)
 
     def ip_record_clean(self):
         """
@@ -86,8 +104,7 @@ class IpBan:
         for f in os.listdir(self._ip_record_dir):
             file_name = os.path.join(self._ip_record_dir, f)
             try:
-                if os.path.isfile(file_name):
-                    os.unlink(file_name)
+                self.safe_unlink(file_name)
             except:
                 pass
 
@@ -118,8 +135,8 @@ class IpBan:
             # touch it
             os.utime(file_name, None)
         else:
-            with open(file_name, 'w') as f:
-                f.write(ip)
+            with open(file_name, 'wb') as f:
+                f.write(self._signer.sign(ip))
         return file_name
 
     def _ip_record_setup(self):
@@ -136,7 +153,7 @@ class IpBan:
                 os.makedirs(self._ip_record_dir)
 
             test_file_name = self._ip_record_write('test', 'test')
-            os.unlink(test_file_name)
+            self.safe_unlink(test_file_name)
             if self._persist:
                 self._ip_record_read_updates(force=True)
             else:
@@ -159,14 +176,14 @@ class IpBan:
         if not self._ipc and not self._persist:
             return
 
-        self._logger.warning('Removing {} for records {}'.format(ip, record_types))
+        self._logger.info('Removing {} for records {}'.format(ip, record_types))
         for filename in os.listdir(self._ip_record_dir):
             try:
                 full_name = os.path.join(self._ip_record_dir, filename)
                 extension = os.path.splitext(filename)[1]
                 if os.path.isfile(full_name):
                     if '-' + ip + '-' in filename and extension in record_types:
-                        os.unlink(full_name)
+                        self.safe_unlink(full_name)
             except Exception as e:
                 self._logger.exception(e)
 
@@ -192,9 +209,10 @@ class IpBan:
                 if not filename.startswith(self._instance_id + '-'):
                     if os.path.isfile(filename_entry['full_name']):
                         if filename_entry['mtime'] > self._last_update_time or force:
-                            with open(filename_entry['full_name'], 'r') as f:
-                                ip = f.readline()
-                                self._logger.warning(
+                            with open(filename_entry['full_name'], 'rb') as f:
+                                signed_ip = f.readline()
+                                ip = self._signer.unsign(signed_ip).decode('utf-8')
+                                self._logger.info(
                                     'Instance: {}, reading ip {} from record {}@{}'.format(self._instance_id, ip,
                                                                                            filename, str(
                                             filename_entry['mtime']).split('.')[0]))
@@ -217,10 +235,12 @@ class IpBan:
                             # clean up old entries
                             elapsed = datetime.now() - filename_entry['mtime']
                             if elapsed.seconds > self.ban_seconds * 2:
-                                os.unlink(filename_entry['full_name'])
+                                self.safe_unlink(filename_entry['full_name'])
 
             except Exception as e:
                 self._logger.exception(e)
+                # attempt to remove the problematic entry
+                self.safe_unlink(filename_entry['full_name'])
         self._last_update_time = datetime.now()
 
     def _after_request(self, response):
@@ -308,13 +328,13 @@ class IpBan:
                 abort(403)
 
             if delta.seconds < self.ban_seconds or self.ban_seconds == 0:
-                self._logger.warning('IP updated in ban list {}.  Url: {}'.format(ip, url))
+                self._logger.info('IP updated in ban list {}.  Url: {}'.format(ip, url))
                 entry['timestamp'] = datetime.now()
                 entry['count'] += 1
                 self._ip_record_write(ip, count=entry['count'])
                 abort(403)
             else:
-                self._logger.warning('IP expired from ban list {}.  Url: {}'.format(ip, url))
+                self._logger.info('IP expired from ban list {}.  Url: {}'.format(ip, url))
                 entry['count'] = 0
 
     def ip_whitelist_add(self, ip):
@@ -491,7 +511,7 @@ class IpBan:
                         self.url_block_pattern_add(value, match_type)
                         added_count += 1
                     except Exception as e:
-                        self._logger.warning(
+                        self._logger.exception(
                             'Exception {exception} adding pattern {value}'.format(value=value, exception=str(e)))
 
         return added_count
@@ -499,6 +519,7 @@ class IpBan:
 
 if __name__ == '__main__':
     import sys
+    import logging
 
     app = Flask(__name__)
 
@@ -506,6 +527,7 @@ if __name__ == '__main__':
                    record_dir='/tmp/flask-ip-ban-test-app')
     ip_ban.url_pattern_add('/unblock', match_type='string')
     ip_ban.load_nuisances()
+    app.logger.setLevel(logging.INFO)
 
 
     def route_block():
@@ -529,13 +551,33 @@ if __name__ == '__main__':
 
 
     def route_hello():
+
+        js = """var interval = null;
+        function startExercise(){
+            interval = setInterval(()=>{
+            const urls = ['/ban','/ban_perm','/remove','/doesnotexist','/unblock','/sftp-config.json'];
+            const r = Math.floor(Math.random()*urls.length);
+            fetch(urls[r]).then(response=>document.getElementById('message').innerText=urls[r] + '-' + response.status);
+        },1500)
+        }
+        function stopExercise(){
+            clearInterval(interval);
+        }
+        """
+
         return '''<h1>ip ban app - timeout: 20 seconds - ban count: 4</h1>
+        <p id='message'></p>
         <a href='/ban'>Block 127.0.0.1</a>
         <a href='/ban_perm'>Block perm 127.0.0.1</a>
         <a href='/remove'>remove 127.0.0.1</a>
         <a href='/doesnotexist'>404</a>
         <a href='/unblock'>unblock</a>
-        '''
+        <a href='/sftp-config.json'>nuisance url</a>
+        <script>{js}</script>
+        <br>
+        <button onclick="startExercise()">Start exercise</button>
+        <button onclick="stopExercise()">Cancel exercise</button>
+        '''.format(js=js)
 
 
     app.route('/')(route_hello)
