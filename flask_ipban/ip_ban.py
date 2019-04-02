@@ -65,7 +65,7 @@ class IpBan:
         self._ip_record_timer_seconds = min(5.0, ban_seconds / 4)  # type: float
         self._last_update_time = datetime.now()
         self._logger = logging
-        self._secret_key = secret_key # type: str
+        self._secret_key = secret_key  # type: str
 
         if app:
             self.init_app(app)
@@ -76,9 +76,12 @@ class IpBan:
         :param app: flask app with logger defined
         :return:
         """
+        secret_key = self._secret_key or app.secret_key or app.config.get('SECRET_KEY') or 'not-very-secret-key'
         self._app = app
-        self._signer = Signer(self._secret_key or app.secret_key or app.config.get('SECRET_KEY') or 'not-very-secret-key')
+        self._signer = Signer(secret_key)
         self._logger = app.logger
+        if secret_key == 'not-very-secret-key':
+            self._logger.warning('secret_key is default of: {}'.format(secret_key))
         self._ip_record_setup()
         app.after_request(self._after_request)
         app.before_request(self._before_request_check)
