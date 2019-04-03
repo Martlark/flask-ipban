@@ -171,10 +171,15 @@ class IpRecord:
             return
 
         # read records and process from oldest to youngest
-        filename_list = [dict(filename=f, full_name=os.path.join(self._ip_record_dir, f),
+        try:
+            filename_list = [dict(filename=f, full_name=os.path.join(self._ip_record_dir, f),
                               mtime=datetime.fromtimestamp(os.path.getmtime(os.path.join(self._ip_record_dir, f)))) for
                          f in os.listdir(self._ip_record_dir)]
-        filename_list = sorted(filename_list, key=operator.itemgetter('mtime'))
+            filename_list = sorted(filename_list, key=operator.itemgetter('mtime'))
+        except Exception as ex:
+            # silently return if a file has been removed during enumeration
+            return
+
         for filename_entry in filename_list:
             try:
                 filename = filename_entry['filename']

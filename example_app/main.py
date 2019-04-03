@@ -18,7 +18,7 @@ from flask_ipban.ip_ban import IpBan
 
 app = Flask(__name__)
 
-app.secret_key = str(os.urandom(50))
+app.secret_key = os.environ.get('SECRET_KEY', str(os.urandom(50)))
 ban_count = 5
 ban_seconds = 5
 
