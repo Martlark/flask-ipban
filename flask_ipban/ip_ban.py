@@ -79,7 +79,7 @@ class IpRecord:
 
     def safe_unlink(self, file_name):
         """
-        safely remove a file if it exists.  only log if error
+        safely remove a file if it exists
         :param file_name:
         :return:
         """
@@ -88,7 +88,7 @@ class IpRecord:
                 # attempt to remove the file
                 os.unlink(file_name)
         except Exception as ex:
-            self._logger.exception(ex)
+            pass
 
     def clean(self):
         """
@@ -213,9 +213,10 @@ class IpRecord:
                             elapsed = datetime.now() - filename_entry['mtime']
                             if elapsed.seconds > self.ip_ban.ban_seconds * 2:
                                 self.safe_unlink(filename_entry['full_name'])
-
+            except FileNotFoundError:
+                pass
             except Exception as e:
-                self._logger.exception(e)
+                self._logger.warning(e)
                 # attempt to remove the problematic entry
                 self.safe_unlink(filename_entry['full_name'])
         self._last_update_time = datetime.now()
