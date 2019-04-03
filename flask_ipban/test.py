@@ -35,7 +35,7 @@ class TestIpBan(unittest.TestCase):
     def setUp(self):
         self.app = flask.Flask(__name__)
         self.ban_seconds = 2
-        self.ip_ban = IpBan(self.app, ban_seconds=self.ban_seconds, ban_count=5)
+        self.ip_ban = IpBan(self.app, ban_seconds=self.ban_seconds, ban_count=5, secret_key='yo-yo-yo', ipc=False)
         self.client = self.app.test_client()
 
         self.app.route('/')(hello_world)

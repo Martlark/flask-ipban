@@ -11,13 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
 from flask import Flask, render_template, abort, request
 
 from flask_ipban.ip_ban import IpBan
 
 app = Flask(__name__)
 
+app.secret_key = str(os.urandom(50))
 ban_count = 5
 ban_seconds = 5
 

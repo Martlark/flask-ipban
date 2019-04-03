@@ -38,7 +38,8 @@ After installing, wrap your Flask app with an ``IpBan``, or call ip_ban.init_app
     from flask_ipban import IpBan
 
     app = Flask(__name__)
-    IpBan(app, ban_seconds=200)
+    ip_ban = IpBan(ban_seconds=200)
+    ip_ban.init_app(app)
 
 
 The repository includes a small example application.
@@ -46,11 +47,13 @@ The repository includes a small example application.
 Options
 -------
 
--  ``ban_count``, default ``20``, Number of observations before banning
--  ``ban_seconds``, default ``60``, Number of seconds ip address is banned
--  ``persist``, default ``False``, Persist, by the use of a file in the tmp folder, the ip ban list.
+-  ``app``,  Flask application to monitor.  Use ip_ban.init_app(app) to intialise later on.
+-  ``ban_count``, default ``20``, Number of observations before banning.
+-  ``ban_seconds``, default ``60``, Number of seconds ip address is banned.
+-  ``persist``, default ``False``, Persist ban list between restarts, using records in the report_dir folder.
 -  ``report_dir``, default ``None``, Override the location of persistence and report files.
--  ``ipc``, default ``True``, Allow multiple instances of ip_ban to cross communicate using the ``report_dir``
+-  ``ipc``, default ``True``, Allow multiple instances of ip_ban to cross communicate using the ``report_dir``.
+-  ``secret_key``, default ``flask secret key``, Key to sign reports in the ``report_dir``.
 
 Config by env variable overrides options
 ########################################
@@ -64,6 +67,7 @@ These environment variables will override options from the initialisation.
 Methods
 -------
 
+-  ``init_app(app)`` - Initialise and start ip_ban with the given Flask application.
 -  ``block(ip_address, permanent=False)`` - block the specific address optionally forever
 -  ``add(ip=None, url=None, reason='404')`` - increase the observations for the current request ip or given ip address
 
@@ -119,7 +123,7 @@ Example of ip_whitelist_add
 
     app = Flask(__name__)
     ip_ban = IpBan(app)
-    ip_ban.whitelist-add('127.0.0.1')
+    ip_ban.whitelist_add('127.0.0.1')
 
 
 -  ``load_nuisances(file_name=None)`` - add a list of nuisances to url pattern block list from a file.  See below for more information.
@@ -155,6 +159,17 @@ Load them by calling ip_ban.load_nuisances()
 You can add your own nuisance yaml file by calling with the parameter file_name=.
 
 See the nuisance.yaml file in the source for formatting and details.
+
+IPC and persistence
+-------------------
+
+By default ip_ban writes out each 404/ban event to a file in the ``record_dir`` folder, which has a default in linux of
+``/tmp/flask-ip-ban``.  This folder has to be writable by the process running your app.  Obviously if you use multiple
+different apps they can share ip_ban reporting.  Each record is signed with the ``secret_key``, so this must be shared
+amongst all applications that use the ``record_dir`` folder.  The ``secret_key`` is by default the flask secret key.
+
+Only ip records using the `block`, `add` and `remove` methods or by 404; are persisted or shared.  Any whitelisting or 
+pattern bans are not presisted/shared and must be done for each instance of your application.
 
 Licensing
 ---------

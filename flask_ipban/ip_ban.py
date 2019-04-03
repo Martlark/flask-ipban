@@ -25,66 +25,57 @@ import yaml
 from flask import Flask, request, abort
 
 
-class IpBan:
+class IpRecord:
     """
-    Implements a simple list of ip addresses that
-    seem to be trying credential stuffing.  Blocks items from that list
-    once they exceed the ban count.
-
-    Optional config by env variable
-    ======
-    IP_BAN_LIST_COUNT - number of observations before 403 exception
-    IP_BAN_LIST_SECONDS - number of seconds to retain memory of IP
-
+    class to read and write ipc messages so that ip_ban can be shared across instances and applications
     """
 
-    def __init__(self, app=None, ban_count=20, ban_seconds=3600, persist=False, record_dir=None, ipc=True,
-                 secret_key=None):
-        """
-        start
-        :param app: (optional when using init_app) flask application with logger defined
-        :param ban_count: (optional) number of observations before ban
-        :param ban_seconds: (optional) number minutes of silence before ban rescinded (0 is never rescind)
-        :param persist: (optional) persists the ban records between app starts by storing in a temp folder
-        :param record_dir: (optional default is flask-ip-ban in the temp folder) a record directory that stores ban records for ipc sync and persistence.
-        :param ipc: enable ipc communication
-        :param secret_key: optional secret key for signing ipc records.  Default is to use flask secret key
-        """
-        self.ban_count = int(os.environ.get('IP_BAN_LIST_COUNT', ban_count))  # type: int
-        self.ban_seconds = int(os.environ.get('IP_BAN_LIST_SECONDS', ban_seconds))  # type: int
-        self._app = None
-
-        self._ip_whitelist = {}
-        self._ip_ban_list = {}
-        self._url_whitelist_patterns = {}
-        self._url_blocklist_patterns = {}
-        self._instance_id = str(random.randint(0, 999999999999))  # type: str
-        self._persist = persist  # type: bool
-        self._ipc = ipc  # type: bool
+    def __init__(self, ip_ban, record_dir, persist, ipc, secret_key):
+        self.ip_ban = ip_ban
+        self._ip_record_timer_seconds = min(5.0, self.ip_ban.ban_seconds / 4)  # type: float
         self._ip_record_dir = record_dir or os.path.join(tempfile.gettempdir(), 'flask-ip-ban')  # type: str
-        self._ip_record_timer_seconds = min(5.0, ban_seconds / 4)  # type: float
+        self._instance_id = str(random.randint(0, 999999999999))  # type: str
+        self._persist = persist
+        self._ipc = ipc
+        self._secret_key = secret_key
+        self._logger = None
+        self._signer = None
         self._last_update_time = datetime.now()
-        self._logger = logging
-        self._secret_key = secret_key  # type: str
 
-        if app:
-            self.init_app(app)
+    def start(self, app):
+        """
+        setup the ip record db
+        if store cannot be setup then ipc will be disabled.
+        :return: True if setup correctly.
+        """
+        if not self._ipc and not self._persist:
+            return False
 
-    def init_app(self, app):
-        """
-        initialise using app as parameter
-        :param app: flask app with logger defined
-        :return:
-        """
-        secret_key = self._secret_key or app.secret_key or app.config.get('SECRET_KEY') or 'not-very-secret-key'
-        self._app = app
-        self._signer = Signer(secret_key)
         self._logger = app.logger
-        if secret_key == 'not-very-secret-key':
-            self._logger.warning('secret_key is default of: {}'.format(secret_key))
-        self._ip_record_setup()
-        app.after_request(self._after_request)
-        app.before_request(self._before_request_check)
+
+        tmp_secret_key = self._secret_key or app.secret_key or app.config.get('SECRET_KEY') or 'not-very-secret-key'
+        if tmp_secret_key == 'not-very-secret-key':
+            self._logger.warning('secret_key is default of: {}'.format(tmp_secret_key))
+
+        self._signer = Signer(tmp_secret_key)
+
+        try:
+            if not os.path.isdir(self._ip_record_dir):
+                os.makedirs(self._ip_record_dir)
+
+            test_file_name = self.write('test', 'test')
+            self.safe_unlink(test_file_name)
+            if self._persist:
+                self.read_updates(force=True)
+            else:
+                self.clean()
+        except Exception as e:
+            self._logger.exception(e)
+            self._logger.error('ip record store cannot be established.  Disabling IPC.')
+            self._ipc = False
+            return False
+
+        return True
 
     def safe_unlink(self, file_name):
         """
@@ -99,7 +90,7 @@ class IpBan:
         except Exception as ex:
             self._logger.exception(ex)
 
-    def ip_record_clean(self):
+    def clean(self):
         """
         clean out all ip record files
         :return: None
@@ -111,7 +102,7 @@ class IpBan:
             except:
                 pass
 
-    def _ip_record_update_from_other_instances(self):
+    def update_from_other_instances(self):
         """
         Read updates from other instances every now and then
         """
@@ -120,9 +111,9 @@ class IpBan:
 
         elapsed = datetime.now() - self._last_update_time
         if elapsed.seconds > self._ip_record_timer_seconds:
-            self._ip_record_read_updates()
+            self.read_updates()
 
-    def _ip_record_write(self, ip, record_type='add', count=0):
+    def write(self, ip, record_type='add', count=0):
         """
         write a ip record into the store
         :param ip: the ip to add
@@ -133,7 +124,12 @@ class IpBan:
         if not self._ipc and not self._persist:
             return
 
-        file_name = os.path.join(self._ip_record_dir, '{}-{}-{}.{}'.format(self._instance_id, ip, count, record_type))
+        safe_ip = ''
+        for s in ip.lower():
+            if s in 'abcdefghijklmnopqrstuvwxyz.0123456789':
+                safe_ip += s
+        file_name = os.path.join(self._ip_record_dir,
+                                 '{}-{}-{}.{}'.format(self._instance_id, safe_ip, count, record_type))
         if os.path.exists(file_name):
             # touch it
             os.utime(file_name, None)
@@ -142,34 +138,7 @@ class IpBan:
                 f.write(self._signer.sign(ip))
         return file_name
 
-    def _ip_record_setup(self):
-        """
-        setup the ip record db and start IPC timer
-        if store cannot be setup then ipc will be disabled.
-        :return: True if setup correctly.
-        """
-        if not self._ipc and not self._persist:
-            return False
-
-        try:
-            if not os.path.isdir(self._ip_record_dir):
-                os.makedirs(self._ip_record_dir)
-
-            test_file_name = self._ip_record_write('test', 'test')
-            self.safe_unlink(test_file_name)
-            if self._persist:
-                self._ip_record_read_updates(force=True)
-            else:
-                self.ip_record_clean()
-        except Exception as e:
-            self._logger.exception(e)
-            self._logger.error('ip record store cannot be established.  Disabling primitive IPC.')
-            self._ipc = False
-            return False
-
-        return True
-
-    def _ip_record_remove(self, ip, record_types):
+    def remove(self, ip, record_types):
         """
         Remove the given record type extensions for the given ip
         :param ip: ip to remove
@@ -190,7 +159,7 @@ class IpBan:
             except Exception as e:
                 self._logger.exception(e)
 
-    def _ip_record_read_updates(self, force=False):
+    def read_updates(self, force=False):
         """
         Read other process and persistence ip records.  Only reads records that are newer than previous run.
         When not persisting older records will be cleaned up when > 2*ban_seconds old
@@ -220,24 +189,24 @@ class IpBan:
                                                                                            filename, str(
                                             filename_entry['mtime']).split('.')[0]))
                                 if filename.endswith('.add'):
-                                    self.add(ip, url=' ', no_write=True, timestamp=filename_entry['mtime'])
+                                    self.ip_ban.add(ip, url=' ', no_write=True, timestamp=filename_entry['mtime'])
                                 elif filename.endswith('.block'):
-                                    self.block([ip], no_write=True, timestamp=filename_entry['mtime'])
+                                    self.ip_ban.block([ip], no_write=True, timestamp=filename_entry['mtime'])
                                 elif filename.endswith('.test'):
                                     pass
                                 elif filename.endswith('.permanent'):
-                                    self.block([ip], permanent=True, no_write=True)
+                                    self.ip_ban.block([ip], permanent=True, no_write=True)
                                 elif filename.endswith('.remove'):
-                                    self.remove(ip, no_write=True)
-                                    self._ip_record_remove(ip, record_types=['.block', '.permanent', '.add'])
+                                    self.ip_ban.remove(ip, no_write=True)
+                                    self.remove(ip, record_types=['.block', '.permanent', '.add'])
                                 else:
                                     raise Exception(
                                         'Instance: {}, unknown ip record type for file: {}'.format(self._instance_id,
                                                                                                    filename))
                         elif not self._persist:
-                            # clean up old entries
+                            # clean up old entry
                             elapsed = datetime.now() - filename_entry['mtime']
-                            if elapsed.seconds > self.ban_seconds * 2:
+                            if elapsed.seconds > self.ip_ban.ban_seconds * 2:
                                 self.safe_unlink(filename_entry['full_name'])
 
             except Exception as e:
@@ -245,6 +214,57 @@ class IpBan:
                 # attempt to remove the problematic entry
                 self.safe_unlink(filename_entry['full_name'])
         self._last_update_time = datetime.now()
+
+
+class IpBan:
+    """
+    Implements a simple list of ip addresses that
+    seem to be trying credential stuffing.  Blocks items from that list
+    once they exceed the ban count.
+
+    Optional config by env variable
+    ======
+    IP_BAN_LIST_COUNT - number of observations before 403 exception
+    IP_BAN_LIST_SECONDS - number of seconds to retain memory of IP
+
+    """
+
+    def __init__(self, app=None, ban_count=20, ban_seconds=3600, persist=False, record_dir=None, ipc=True,
+                 secret_key=None):
+        """
+        start
+        :param app: (optional when using init_app) flask application with logger defined
+        :param ban_count: (optional) number of observations before ban
+        :param ban_seconds: (optional) number minutes of silence before ban rescinded (0 is never rescind)
+        :param persist: (optional) persists the ban records between app starts by storing in a temp folder
+        :param record_dir: (optional default is flask-ip-ban in the temp folder) a record directory that stores ban records for ipc sync and persistence.
+        :param ipc: enable ipc communication
+        :param secret_key: optional secret key for signing ipc records.  Default is to use flask secret key
+        """
+        self.ban_count = int(os.environ.get('IP_BAN_LIST_COUNT', ban_count))  # type: int
+        self.ban_seconds = int(os.environ.get('IP_BAN_LIST_SECONDS', ban_seconds))  # type: int
+
+        self._ip_whitelist = {}
+        self._ip_ban_list = {}
+        self._url_whitelist_patterns = {}
+        self._url_blocklist_patterns = {}
+        self._logger = None
+
+        self.ip_record = IpRecord(self, record_dir, persist, ipc, secret_key)
+
+        if app:
+            self.init_app(app)
+
+    def init_app(self, app):
+        """
+        initialise using app as parameter
+        :param app: flask app with logger defined
+        :return:
+        """
+        self._logger = app.logger
+        app.after_request(self._after_request)
+        app.before_request(self._before_request_check)
+        self.ip_record.start(app)
 
     def _after_request(self, response):
         """
@@ -280,9 +300,9 @@ class IpBan:
             else:
                 self._ip_ban_list[ip] = dict(timestamp=timestamp, count=self.ban_count * 2, permanent=permanent)
             self._logger.info('{ip} added to ban list.'.format(ip=ip))
-            self._ip_record_remove(ip, record_types=['.remove'])
+            self.ip_record.remove(ip, record_types=['.remove'])
             if not no_write:
-                self._ip_record_write(ip, record_type='permanent' if permanent else 'block')
+                self.ip_record.write(ip, record_type='permanent' if permanent else 'block')
         return len(self._ip_ban_list)
 
     def test_pattern_blocklist(self, url, ip=None):
@@ -313,7 +333,7 @@ class IpBan:
         checks url, blocklist and ip lists
         """
 
-        self._ip_record_update_from_other_instances()
+        self.ip_record.update_from_other_instances()
 
         if self._is_excluded():
             return
@@ -334,7 +354,7 @@ class IpBan:
                 self._logger.debug('IP updated in ban list {}.  Url: {}'.format(ip, url))
                 entry['timestamp'] = datetime.now()
                 entry['count'] += 1
-                self._ip_record_write(ip, count=entry['count'])
+                self.ip_record.write(ip, count=entry['count'])
                 abort(403)
             else:
                 self._logger.debug('IP expired from ban list {}.  Url: {}'.format(ip, url))
@@ -452,7 +472,7 @@ class IpBan:
             if self.test_pattern_blocklist(url, ip=ip):
                 self.block([ip])
                 if not no_write:
-                    self._ip_record_write(ip)
+                    self.ip_record.write(ip)
                 return True
 
         if timestamp and timestamp > datetime.now():
@@ -471,7 +491,7 @@ class IpBan:
         self._logger.info(
             '{}. {} {} added/updated ban list. Count: {}'.format(reason, ip, url, entry['count']))
         if not no_write:
-            self._ip_record_write(ip, count=entry['count'])
+            self.ip_record.write(ip, count=entry['count'])
         return True
 
     def remove(self, ip, no_write=False):
@@ -483,8 +503,8 @@ class IpBan:
         """
 
         if not no_write:
-            self._ip_record_write(ip, record_type='remove')
-        self._ip_record_remove(ip, record_types=['.block', '.permanent', '.add'])
+            self.ip_record.write(ip, record_type='remove')
+        self.ip_record.remove(ip, record_types=['.block', '.permanent', '.add'])
 
         entry = self._ip_ban_list.get(ip)
         if not entry:
@@ -527,30 +547,31 @@ if __name__ == '__main__':
     app = Flask(__name__)
 
     app.secret_key = str('abscdefghijklj430urojfdshfdsoih')
-    ip_ban = IpBan(app=app, ban_count=4, ban_seconds=20, persist=False,
-                   record_dir='/tmp/flask-ip-ban-test-app')
-    ip_ban.url_pattern_add('/unblock', match_type='string')
-    ip_ban.load_nuisances()
+    test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True,
+                        record_dir='/tmp/flask-ip-ban-test-app')
+    test_ip_ban.init_app(app)
+    test_ip_ban.url_pattern_add('/unblock', match_type='string')
+    test_ip_ban.load_nuisances()
     app.logger.setLevel(logging.INFO)
 
 
     def route_block():
-        ip_ban.block(['127.0.0.1'])
+        test_ip_ban.block(['127.0.0.1'])
         return '<h1>You are now blocked</h1>'
 
 
     def route_remove():
-        ip_ban.remove('127.0.0.1')
+        test_ip_ban.remove('127.0.0.1')
         return '<h1>You are now free</h1>'
 
 
     def route_block_perm():
-        ip_ban.block(['127.0.0.1'], permanent=True)
+        test_ip_ban.block(['127.0.0.1'], permanent=True)
         return '<h1>You are now blocked</h1>'
 
 
     def route_unblock():
-        ip_ban.remove('127.0.0.1')
+        test_ip_ban.remove('127.0.0.1')
         return '<h1>You are now un blocked</h1>'
 
 
