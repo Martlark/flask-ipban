@@ -113,29 +113,37 @@ class IpRecord:
         if elapsed.seconds > self._ip_record_timer_seconds:
             self.read_updates()
 
+    @classmethod
+    def path_clean(cls, dirty):
+        clean = ''
+        for c in dirty:
+            if c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.0123456789_':
+                clean += c
+        return clean
+
     def write(self, ip, record_type='add', count=0):
         """
         write a ip record into the store
         :param ip: the ip to add
         :param record_type: type of record, could be: add (default), permanent, block, remove, test
         :param count: the list count of the add - allows adds to be communicated
-        :return:the file_name of the record or None if nothing going on
+        :return:the file_name of the record or None if nothing going or can't write
         """
         if not self._ipc and not self._persist:
             return
 
-        safe_ip = ''
-        for s in ip.lower():
-            if s in 'abcdefghijklmnopqrstuvwxyz.0123456789':
-                safe_ip += s
+        safe_ip = IpRecord.path_clean(ip)
         file_name = os.path.join(self._ip_record_dir,
                                  '{}-{}-{}.{}'.format(self._instance_id, safe_ip, count, record_type))
-        if os.path.exists(file_name):
-            # touch it
-            os.utime(file_name, None)
-        else:
-            with open(file_name, 'wb') as f:
-                f.write(self._signer.sign(ip))
+        try:
+            if os.path.exists(file_name):
+                # touch it
+                os.utime(file_name, None)
+            else:
+                with open(file_name, 'wb') as f:
+                    f.write(self._signer.sign(ip))
+        except:
+            return
         return file_name
 
     def remove(self, ip, record_types):
@@ -153,9 +161,8 @@ class IpRecord:
             try:
                 full_name = os.path.join(self._ip_record_dir, filename)
                 extension = os.path.splitext(filename)[1]
-                if os.path.isfile(full_name):
-                    if '-' + ip + '-' in filename and extension in record_types:
-                        self.safe_unlink(full_name)
+                if '-' + ip + '-' in filename and extension in record_types:
+                    self.safe_unlink(full_name)
             except Exception as e:
                 self._logger.exception(e)
 
@@ -173,8 +180,9 @@ class IpRecord:
         # read records and process from oldest to youngest
         try:
             filename_list = [dict(filename=f, full_name=os.path.join(self._ip_record_dir, f),
-                              mtime=datetime.fromtimestamp(os.path.getmtime(os.path.join(self._ip_record_dir, f)))) for
-                         f in os.listdir(self._ip_record_dir)]
+                                  mtime=datetime.fromtimestamp(os.path.getmtime(os.path.join(self._ip_record_dir, f))))
+                             for
+                             f in os.listdir(self._ip_record_dir)]
             filename_list = sorted(filename_list, key=operator.itemgetter('mtime'))
         except Exception as ex:
             # silently return if a file has been removed during enumeration
@@ -305,7 +313,7 @@ class IpBan:
                 entry['permanent'] = entry.get('permanent') or permanent  # retain permanent on extra blocks
             else:
                 self._ip_ban_list[ip] = dict(timestamp=timestamp, count=self.ban_count * 2, permanent=permanent)
-            self._logger.info('{ip} added to ban list.'.format(ip=ip))
+            self._logger.warning('{ip} added to ban list.'.format(ip=ip))
             self.ip_record.remove(ip, record_types=['.remove'])
             if not no_write:
                 self.ip_record.write(ip, record_type='permanent' if permanent else 'block')
@@ -476,9 +484,7 @@ class IpBan:
         # or existing entry has expired
         if not entry or (entry and entry.get('count', 0) < self.ban_count):
             if self.test_pattern_blocklist(url, ip=ip):
-                self.block([ip])
-                if not no_write:
-                    self.ip_record.write(ip)
+                self.block([ip], no_write=no_write)
                 return True
 
         if timestamp and timestamp > datetime.now():
