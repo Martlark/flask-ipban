@@ -24,7 +24,7 @@
 #
 # url strings are stripped of any parameters before checking
 #
-# php, java, .net etal should not be handled by flask
+# php, java, .net .etc. .etc. .etc. extensions should not be handled by flask
 
 regex:
   - .*\.action$
@@ -32,21 +32,41 @@ regex:
   - .*\.aspx$
   - .*\.asx$
   - .*\.cfm$
+  - .*\.cf$
   - .*\.cgi$
+  - .*\.cobolt$
+  - .*\.conf$
+  - .*\.dll$
   - .*\.do$
   - .*\.env$
+  - .*\.exe$
+  - .*\.json$
   - .*\.jsp$
   - .*\.jspx$
+  - .*\.mdb$
   - .*\.nsf$
+  - .*\.pem$
   - .*\.php$
+  - .*\.pl$
+  - .*\.py$
+  - .*\.sh$
+  - .*\.tar$
+  - .*\.war$
   - .*\.wss$
-  # hacking attempts
+  # hacking or scanning attempts
   - .*/a2billing/.*
+  - \/.*\/(calendar|date|fortune|redirect|passwd)$
   - .*?PHPSESSID=
   - .*\/usage_201811$
   - .*\/usage_201811.html$
   - .*\/wp-admin\/$
   - .*netease\.com\:25$
+  - \/([sf]|web|ows|mp)cgi(-bin|)\/
+  - \/bin\/
+  - \/htbin\/
+  - \/scripts\/
+  - \/HNAP1\/
+  - \/WEB-INF\/
 
 string:
   # all of these are hacking attempts by vulnerability scanners
