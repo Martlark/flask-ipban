@@ -2,11 +2,11 @@
 #
 version: '2'
 services:
-    flask-ip-ban-example:
-        build:
-            context: .
-        ports:
-            - "8004:80"
-        environment:
-            SECRET_KEY: "juejfsy0-90847yh3434h43hskhj3h324isdh"
-        restart: on-failure
+  flask-ip-ban-example:
+    build:
+      context: .
+    ports:
+      - "8004:80"
+    environment:
+      SECRET_KEY: "juejfsy0-90847yh3434h43hskhj3h324isdh"
+    restart: on-failure

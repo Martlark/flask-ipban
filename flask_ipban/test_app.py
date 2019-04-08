@@ -3,6 +3,11 @@ import sys
 import logging
 from flask_ipban.ip_ban import IpBan
 
+
+"""
+small flask application for testing of functions.
+"""
+
 secret_key = 'abscdefghijklj430urojfdshfdsoih'
 test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='/tmp/flask-ip-ban-test-app')
 app = Flask(__name__)
@@ -72,4 +77,4 @@ def run():
     port = 8887
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
-    app.run(host='127.0.0.1', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=True)

@@ -22,7 +22,7 @@ from datetime import datetime
 from itsdangerous import Signer
 
 import yaml
-from flask import Flask, request, abort
+from flask import request, abort
 
 
 class IpRecord:
