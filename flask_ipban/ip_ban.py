@@ -114,9 +114,10 @@ class IpRecord:
     @classmethod
     def path_clean(cls, dirty):
         clean = ''
-        for c in dirty:
-            if c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.0123456789_':
-                clean += c
+        if dirty:
+            for c in dirty:
+                if c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.0123456789_':
+                    clean += c
         return clean
 
     def write(self, ip, record_type='add', count=0):
@@ -242,7 +243,7 @@ class IpBan:
     """
 
     def __init__(self, app=None, ban_count=20, ban_seconds=3600, persist=False, record_dir=None, ipc=True,
-                 secret_key=None):
+                 secret_key=None, ip_header=None):
         """
         start
         :param app: (optional when using init_app) flask application with logger defined
@@ -252,6 +253,7 @@ class IpBan:
         :param record_dir: (optional default is flask-ip-ban in the temp folder) a record directory that stores ban records for ipc sync and persistence.
         :param ipc: enable ipc communication
         :param secret_key: optional secret key for signing ipc records.  Default is to use flask secret key
+        :param ip_header: name of request header that contains the ip for use behind proxies when in docker/kube hosted env
         """
         self.ban_count = int(os.environ.get('IP_BAN_LIST_COUNT', ban_count))  # type: int
         self.ban_seconds = int(os.environ.get('IP_BAN_LIST_SECONDS', ban_seconds))  # type: int
@@ -261,6 +263,7 @@ class IpBan:
         self._url_whitelist_patterns = {}
         self._url_blocklist_patterns = {}
         self._logger = None
+        self.ip_header = ip_header
 
         self.ip_record = IpRecord(self, record_dir, persist, ipc, secret_key)
 
@@ -317,6 +320,12 @@ class IpBan:
                 self.ip_record.write(ip, record_type='permanent' if permanent else 'block')
         return len(self._ip_ban_list)
 
+    def get_ip(self):
+        ip = None
+        if self.ip_header:
+            ip = request.headers.get(self.ip_header)
+        return ip or request.environ.get('REMOTE_ADDR')
+
     def test_pattern_blocklist(self, url, ip=None):
         """
         return true if the url or ip pattern matches an existing block
@@ -350,7 +359,7 @@ class IpBan:
         if self._is_excluded():
             return
 
-        ip = request.environ.get('REMOTE_ADDR')
+        ip = self.get_ip()
         url = request.environ.get('PATH_INFO')
 
         entry = self._ip_ban_list.get(ip)
@@ -442,7 +451,7 @@ class IpBan:
         """
 
         if not ip:
-            ip = request.environ.get('REMOTE_ADDR')
+            ip = self.get_ip()
         if not url:
             url = request.environ.get('PATH_INFO')
 
@@ -469,7 +478,7 @@ class IpBan:
         :return True if entry added/updated
         """
         if not ip:
-            ip = request.environ.get('REMOTE_ADDR')
+            ip = self.get_ip()
 
         if not url:
             url = request.environ.get('PATH_INFO')
@@ -560,31 +569,39 @@ if __name__ == '__main__':
     """
 
     secret_key = 'abscdefghijklj430urojfdshfdsoih'
-    test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='/tmp/flask-ip-ban-test-app')
+    my_ip = '123.45.12.112'
+    test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='/tmp/flask-ip-ban-test-app',
+                        ip_header='X_IP_HEADER')
     app = Flask(__name__)
+
+
+    @app.after_request
+    def hook_after_request(response):
+        response.headers['X_IP_HEADER'] = '123.45.12.112'
+        return response
 
 
     @app.route('/ban')
     def route_block():
-        test_ip_ban.block(['127.0.0.1'])
+        test_ip_ban.block([my_ip])
         return '<h1>You are now blocked</h1>'
 
 
     @app.route('/remove')
     def route_remove():
-        test_ip_ban.remove('127.0.0.1')
+        test_ip_ban.remove(my_ip)
         return '<h1>You are now free</h1>'
 
 
     @app.route('/ban_perm')
     def route_block_perm():
-        test_ip_ban.block(['127.0.0.1'], permanent=True)
+        test_ip_ban.block([my_ip], permanent=True)
         return '<h1>You are now blocked</h1>'
 
 
     @app.route('/unblock')
     def route_unblock():
-        test_ip_ban.remove('127.0.0.1')
+        test_ip_ban.remove(my_ip)
         return '<h1>You are now un blocked</h1>'
 
 
@@ -605,9 +622,9 @@ if __name__ == '__main__':
 
         return '''<h1>ip ban app - timeout: 20 seconds - ban count: 4</h1>
         <p id='message'></p>
-        <a href='/ban'>Block 127.0.0.1</a>
-        <a href='/ban_perm'>Block perm 127.0.0.1</a>
-        <a href='/remove'>remove 127.0.0.1</a>
+        <a href='/ban'>Block {ip}</a>
+        <a href='/ban_perm'>Block perm {ip}</a>
+        <a href='/remove'>remove {ip}</a>
         <a href='/doesnotexist'>404</a>
         <a href='/unblock'>unblock</a>
         <a href='/sftp-config.json'>nuisance url</a>
@@ -615,7 +632,7 @@ if __name__ == '__main__':
         <br>
         <button onclick="startExercise()">Start exercise</button>
         <button onclick="stopExercise()">Cancel exercise</button>
-        '''.format(js=js)
+        '''.format(js=js, ip=my_ip)
 
 
     app.secret_key = secret_key
