@@ -4,3 +4,4 @@ tox
 twine
 pyyaml
 itsdangerous
+requests

@@ -54,7 +54,7 @@ Options
 -  ``report_dir``, default ``None``, Override the location of persistence and report files.
 -  ``ipc``, default ``True``, Allow multiple instances of ip_ban to cross communicate using the ``report_dir``.
 -  ``secret_key``, default ``flask secret key``, Key to sign reports in the ``report_dir``.
--  ``ip_header``, default ``None``, Optional name of request header that contains the ip for use behind proxies when in docker/kube hosted env.
+-  ``ip_header``, default ``None``, Optional name of request header that contains the ip for use behind proxies when in a docker/kube hosted env.
 
 
 Config by env variable overrides options
@@ -176,13 +176,15 @@ pattern bans are not presisted/shared and must be done for each instance of your
 IP Header
 ---------
 When running a flask app in a docker hosted environment (or similar) the ip address will be the virtual
-adapter ip and won't change for differing request.  Use your proxy server to set the real IP address in a header
+adapter ip and won't change for differing requests.  Use your proxy server to set the real IP address in a header
 so that ip-ban can find what it really is.  For apache:
 
-..
-    RequestHeader set X_TRUE_IP "%{REMOTE_ADDR}s"
-    ProxyPass / http://localhost:8080/
-    ProxyPassReverse / http://localhost:8080/
+
+    ``RequestHeader set X_TRUE_IP "%{REMOTE_ADDR}s"``
+
+    ``ProxyPass / http://localhost:8080/``
+
+    ``ProxyPassReverse / http://localhost:8080/``
 
 
 Licensing

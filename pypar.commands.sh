@@ -20,7 +20,7 @@ pip install twine
 
 python3 setup.py sdist bdist_wheel
 #
-twine check dist/flask_ipban-1.0.45*
+twine check dist/flask_ipban-1.0.5*
 # test
 # pip install -e .
 # twine upload --repository-url https://test.pypi.org/legacy/ dist/* -u martlark

@@ -18,7 +18,10 @@ import os
 import random
 import re
 import tempfile
+import json
 from datetime import datetime
+
+import requests
 from itsdangerous import Signer
 
 import yaml
@@ -229,6 +232,149 @@ class IpRecord:
         self._last_update_time = datetime.now()
 
 
+class ExceptionLockInUse(Exception):
+    def __init__(self, message):
+        # Call the base class constructor with the parameters it needs
+        super(Exception, self).__init__(message)
+
+
+class GetLock:
+    def blank_lockf(self, file_handle, options):
+        pass
+
+    def __init__(self, lock_file_prefix=__name__):
+
+        self.lock_file_path = os.path.join(os.environ.get('TEMP', '/tmp'), lock_file_prefix + '.lock')
+
+        try:
+            fcntl = __import__('fcntl')
+            self.lockf = fcntl.lockf
+            self.LOCK_EX = fcntl.LOCK_EX
+            self.LOCK_NB = fcntl.LOCK_NB
+        except ImportError:
+            self.lockf = self.blank_lockf
+            self.LOCK_EX = 0
+            self.LOCK_NB = 0
+
+    def __enter__(self):
+        if os.path.exists(self.lock_file_path):
+            try:
+                with open(self.lock_file_path, 'w') as existing_lock_file:
+                    self.lockf(existing_lock_file, self.LOCK_EX | self.LOCK_NB)
+                os.unlink(self.lock_file_path)
+            except:
+                raise ExceptionLockInUse('lock file:{} in use'.format(self.lock_file_path))
+
+        self.lock_file = open(self.lock_file_path, 'w')
+        self.lockf(self.lock_file, self.LOCK_EX)
+
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if hasattr(self, 'lock_file'):
+            self.lock_file.close()
+        if os.path.exists(self.lock_file_path):
+            os.unlink(self.lock_file_path)
+
+
+class AbuseIPDB:
+    def __init__(self, logger, ip_ban, key, report=False, load=False):
+        """
+        Report/load to AbuseIPDB.com
+        :param logger: flask logger to use
+        :param ip_ban: ip_ban instance
+        :param key: AbuseIPDB.com api key
+        :param report: True/False - report url blocks to AbuseIPDB
+        :param load:  True/False - load the AbuseIPDB blacklist
+        """
+        self.key = key
+        self.logger = logger
+        self.ip_ban = ip_ban
+        self.report = report
+        self.end_point = 'https://api.abuseipdb.com/api/v2/'
+        self.categories = [21]  # Web App Attack
+        self.lock_name = 'flask-ip-ban-abuse-ipdb-load'
+        if load:
+            self.import_black_list()
+
+    def report_ip(self, ip, reason, categories=None):
+        if not self.report:
+            return
+            """
+            # POST the submission.
+    curl https://api.abuseipdb.com/api/v2/report \
+      --data-urlencode "ip=127.0.0.1" \
+      -d categories=18,22 \
+      --data-urlencode "comment=SSH login attempts with user root." \
+      -H "Key: $YOUR_API_KEY" \
+      -H "Accept: application/json"
+    """
+
+        url = self.end_point + 'report'
+        data = json.dumps(dict(ip=ip, comment=reason, categories=','.join(map(str, categories or self.categories))))
+        headers = dict(Accept='application/json', Key=self.key)
+        try:
+            response = requests.get(url, params=data, headers=headers).content
+            self.logger.warn('reported ip {} for {}.  Response: {}'.format(ip, reason, response))
+        except Exception as e:
+            self.logger.error('Error reporting ip to {}'.format(url))
+            self.logger.exception(e)
+
+    def import_black_list(self):
+        """
+        # The -G option will convert form parameters (-d options) into query parameters.
+# The CHECK endpoint is a GET request.
+curl -G https://api.abuseipdb.com/api/v2/blacklist \
+  -d countMinimum=15 \
+  -d maxAgeInDays=60 \
+  -d confidenceMinimum=90 \
+  -H "Key: $YOUR_API_KEY" \
+  -H "Accept: application/json"
+
+  {
+  "meta": {
+    "generatedAt": "2018-12-21T16:00:04+00:00"
+  },
+  "data": [
+    {
+      "ipAddress": "5.188.10.179",
+      "totalReports": 560,
+      "abuseConfidenceScore": 100
+    },
+    {
+      "ipAddress": "185.222.209.14",
+      "totalReports": 529,
+      "abuseConfidenceScore": 100
+    },
+    {
+      "ipAddress": "191.96.249.183",
+      "totalReports": 325,
+      "abuseConfidenceScore": 100
+    },
+    ...
+  ]
+}
+
+        :return:
+        """
+        url = self.end_point + 'blacklist'
+        data = json.dumps(dict(countMinimum=15, maxAgeInDays=20, confidenceMinimum=100))
+        headers = dict(Accept='application/json', Key=self.key)
+        try:
+            with GetLock(self.lock_name):
+                response = requests.get(url, params=data, headers=headers).content
+                json_response = json.loads(response.decode('utf-8'))
+                self.logger.warn('Got ip blacklist.  Importing {} records.'.format(len(json_response['data'])))
+                ip_list = [record['ipAddress'] for record in json_response['data']]
+                self.ip_ban.block(ip_list=ip_list, no_write=False)
+        except ExceptionLockInUse:
+            self.logger.warn('Other flask-ip-ban process has import lock:{}'.format(self.lock_name))
+            return
+        except Exception as e:
+            self.logger.error('Error importing ip blacklist from: {}.  Response: {}'.format(url, response))
+            self.logger.exception(e)
+
+
 class IpBan:
     """
     Implements a simple list of ip addresses that
@@ -243,7 +389,7 @@ class IpBan:
     """
 
     def __init__(self, app=None, ban_count=20, ban_seconds=3600, persist=False, record_dir=None, ipc=True,
-                 secret_key=None, ip_header=None):
+                 secret_key=None, ip_header=None, abuse_IPDB_config={}):
         """
         start
         :param app: (optional when using init_app) flask application with logger defined
@@ -254,6 +400,7 @@ class IpBan:
         :param ipc: enable ipc communication
         :param secret_key: optional secret key for signing ipc records.  Default is to use flask secret key
         :param ip_header: name of request header that contains the ip for use behind proxies when in docker/kube hosted env
+        :param abuse_IPDB_config: config {key=,report=False,load=False} to a AbuseIPDB.com account.  Blocked ip addresses via url nuisance matching will be reported.
         """
         self.ban_count = int(os.environ.get('IP_BAN_LIST_COUNT', ban_count))  # type: int
         self.ban_seconds = int(os.environ.get('IP_BAN_LIST_SECONDS', ban_seconds))  # type: int
@@ -262,8 +409,11 @@ class IpBan:
         self._ip_ban_list = {}
         self._url_whitelist_patterns = {}
         self._url_blocklist_patterns = {}
+        self.app = None
         self._logger = None
+        self.abuse_reporter = None
         self.ip_header = ip_header
+        self.abuse_IPDB_config = abuse_IPDB_config
 
         self.ip_record = IpRecord(self, record_dir, persist, ipc, secret_key)
 
@@ -277,9 +427,21 @@ class IpBan:
         :return:
         """
         self._logger = app.logger
+        self.app = app
         app.after_request(self._after_request)
         app.before_request(self._before_request_check)
         self.ip_record.start(app)
+        self.abuse_reporter = AbuseIPDB(logger=self._logger, ip_ban=self, key=self.abuse_IPDB_config.get('key'),
+                                        report=self.abuse_IPDB_config.get('report'),
+                                        load=self.abuse_IPDB_config.get('load'))
+
+    def import_IPDB_black_list(self):
+        """
+        load up a list of ip addresses in the AbuseIPDB database.  Note: free rate limit is 5 per day
+        :return:
+        """
+        if self.abuse_reporter and self.abuse_IPDB_key:
+            self.abuse_reporter.import_black_list()
 
     def _after_request(self, response):
         """
@@ -492,6 +654,10 @@ class IpBan:
         if not entry or (entry and entry.get('count', 0) < self.ban_count):
             if self.test_pattern_blocklist(url, ip=ip):
                 self.block([ip], no_write=no_write)
+                if not no_write and url and self.abuse_IPDB_config.get('key'):
+                    if self.app.debug:
+                        ip = '127.0.0.2'
+                    self.abuse_reporter.report_ip(ip, reason='flask_ip_ban.  URL requested:{}'.format(url))
                 return True
 
         if timestamp and timestamp > datetime.now():
@@ -569,9 +735,12 @@ if __name__ == '__main__':
     """
 
     secret_key = 'abscdefghijklj430urojfdshfdsoih'
-    my_ip = '123.45.12.112'
+    my_ip = '127.0.0.1'
     test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='/tmp/flask-ip-ban-test-app',
-                        ip_header='X_IP_HEADER')
+                        ip_header='X_IP_HEADER',
+                        abuse_IPDB_config=dict(
+                            key='00d3a5644311310573bdc5c98504981c6c87953abbd2d5b01f052459e7f40d800e5b0d08952d9a27',
+                            report=True, load=True))
     app = Flask(__name__)
 
 
@@ -601,8 +770,8 @@ if __name__ == '__main__':
 
     @app.route('/unblock')
     def route_unblock():
-        test_ip_ban.remove(my_ip)
-        return '<h1>You are now un blocked</h1>'
+        removed = test_ip_ban.remove(my_ip)
+        return '<h1>Un blocked {}={}</h1><a href="/">Home</a>'.format(my_ip, removed)
 
 
     @app.route('/')
