@@ -784,7 +784,7 @@ if __name__ == '__main__':
     test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='/tmp/flask-ip-ban-test-app',
                         # ip_header='X_IP_HEADER',
                         abuse_IPDB_config=dict(
-                            key='00d3a5644311310573bdc5c98504981c6c87953abbd2d5b01f052459e7f40d800e5b0d08952d9a27',
+                            key=os.environ.get('ABSUSE_IPDB_KEY'),
                             report=False, load=False))
     app = Flask(__name__)
 
@@ -816,6 +816,11 @@ if __name__ == '__main__':
     @app.route('/display')
     def route_display():
         return test_ip_ban.display()
+
+
+    @app.route('/favicon.ico')
+    def route_favicon():
+        return ''
 
 
     @app.route('/unblock')
