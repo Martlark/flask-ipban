@@ -44,6 +44,8 @@ class IpRecord:
         self._logger = None
         self._signer = None
         self._last_update_time = datetime.now()
+        self.init = True
+        self.listdir = None
 
     def start(self, app):
         """
@@ -76,8 +78,10 @@ class IpRecord:
             self._logger.exception(e)
             self._logger.error('ip record store cannot be established.  Disabling IPC.')
             self._ipc = False
+            self.init = False
             return False
 
+        self.init = False
         return True
 
     @staticmethod
@@ -159,14 +163,20 @@ class IpRecord:
             return
 
         self._logger.debug('Removing {} for records {}'.format(ip, record_types))
-        for filename in os.listdir(self._ip_record_dir):
-            try:
-                full_name = os.path.join(self._ip_record_dir, filename)
-                extension = os.path.splitext(filename)[1]
-                if '-' + ip + '-' in filename and extension in record_types:
-                    self.safe_unlink(full_name)
-            except Exception as e:
-                self._logger.exception(e)
+        if not self.init:
+            self.listdir = None
+
+        if not self.listdir:
+            self.listdir = []
+            for filename in os.listdir(self._ip_record_dir):
+                self.listdir.append(dict(
+                    filename=filename,
+                    full_name=os.path.join(self._ip_record_dir, filename),
+                    extension=os.path.splitext(filename)[1]))
+
+        for entry in self.listdir:
+            if '-' + ip + '-' in entry['filename'] and entry['extension'] in record_types:
+                self.safe_unlink(entry['full_name'])
 
     def read_updates(self, force=False):
         """
@@ -182,7 +192,8 @@ class IpRecord:
         # read records and process from oldest to youngest
         try:
             filename_list = [dict(filename=f, full_name=os.path.join(self._ip_record_dir, f),
-                                  mtime=datetime.fromtimestamp(os.path.getmtime(os.path.join(self._ip_record_dir, f))))
+                                  mtime=datetime.fromtimestamp(
+                                      os.path.getmtime(os.path.join(self._ip_record_dir, f))))
                              for
                              f in os.listdir(self._ip_record_dir)]
             filename_list = sorted(filename_list, key=operator.itemgetter('mtime'))
@@ -190,6 +201,7 @@ class IpRecord:
             # silently return if a file has been removed during enumeration
             return
 
+        now = datetime.now()
         for filename_entry in filename_list:
             try:
                 filename = filename_entry['filename']
@@ -198,26 +210,36 @@ class IpRecord:
                         if filename_entry['mtime'] > self._last_update_time or force:
                             with open(filename_entry['full_name'], 'rb') as f:
                                 signed_ip = f.readline()
-                                ip = self._signer.unsign(signed_ip).decode('utf-8')
-                                self._logger.debug(
-                                    'Instance: {}, reading ip {} from record {}@{}'.format(self._instance_id, ip,
-                                                                                           filename, str(
-                                            filename_entry['mtime']).split('.')[0]))
-                                if filename.endswith('.add'):
+
+                            ip = self._signer.unsign(signed_ip).decode('utf-8')
+                            self._logger.debug(
+                                'Instance: {}, reading ip {} from record {}@{}'.format(self._instance_id, ip,
+                                                                                       filename, str(
+                                        filename_entry['mtime']).split('.')[0]))
+                            if filename.endswith('.add'):
+                                delta = now - filename_entry['mtime']
+                                if delta.seconds < self.ip_ban.ban_seconds:
                                     self.ip_ban.add(ip, url=' ', no_write=True, timestamp=filename_entry['mtime'])
-                                elif filename.endswith('.block'):
-                                    self.ip_ban.block([ip], no_write=True, timestamp=filename_entry['mtime'])
-                                elif filename.endswith('.test'):
-                                    pass
-                                elif filename.endswith('.permanent'):
-                                    self.ip_ban.block([ip], permanent=True, no_write=True)
-                                elif filename.endswith('.remove'):
-                                    self.ip_ban.remove(ip, no_write=True)
-                                    self.remove(ip, record_types=['.block', '.permanent', '.add'])
                                 else:
-                                    raise Exception(
-                                        'Instance: {}, unknown ip record type for file: {}'.format(self._instance_id,
-                                                                                                   filename))
+                                    self.safe_unlink(filename_entry['full_name'])
+                            elif filename.endswith('.block'):
+                                delta = now - filename_entry['mtime']
+                                if delta.seconds < self.ip_ban.ban_seconds:
+                                    self.ip_ban.block([ip], no_write=True, timestamp=filename_entry['mtime'])
+                                else:
+                                    self.safe_unlink(filename_entry['full_name'])
+                            elif filename.endswith('.test'):
+                                self.safe_unlink(filename_entry['full_name'])
+                            elif filename.endswith('.permanent'):
+                                self.ip_ban.block([ip], permanent=True, no_write=True)
+                            elif filename.endswith('.remove'):
+                                self.ip_ban.remove(ip, no_write=True)
+                                self.remove(ip, record_types=['.block', '.permanent', '.add'])
+                            else:
+                                raise Exception(
+                                    'Instance: {}, unknown ip record type for file: {}'.format(
+                                        self._instance_id,
+                                        filename))
                         elif not self._persist:
                             # clean up old entry
                             elapsed = datetime.now() - filename_entry['mtime']
@@ -414,6 +436,7 @@ class IpBan:
         self.abuse_reporter = None
         self.ip_header = ip_header
         self.abuse_IPDB_config = abuse_IPDB_config
+        self.init = True
 
         self.ip_record = IpRecord(self, record_dir, persist, ipc, secret_key)
 
@@ -434,6 +457,7 @@ class IpBan:
         self.abuse_reporter = AbuseIPDB(logger=self._logger, ip_ban=self, key=self.abuse_IPDB_config.get('key'),
                                         report=self.abuse_IPDB_config.get('report'),
                                         load=self.abuse_IPDB_config.get('load'))
+        self.init = False
 
     def import_IPDB_black_list(self):
         """
@@ -476,7 +500,9 @@ class IpBan:
                 entry['permanent'] = entry.get('permanent') or permanent  # retain permanent on extra blocks
             else:
                 self._ip_ban_list[ip] = dict(timestamp=timestamp, count=self.ban_count * 2, permanent=permanent)
-            self._logger.warning('{ip} added to ban list.'.format(ip=ip))
+
+            if not (no_write or self.init):
+                self._logger.warning('{ip} added to ban list.'.format(ip=ip))
             self.ip_record.remove(ip, record_types=['.remove'])
             if not no_write:
                 self.ip_record.write(ip, record_type='permanent' if permanent else 'block')
@@ -628,6 +654,24 @@ class IpBan:
 
         return False
 
+    def display(self, option='html'):
+        s = ''
+        if option == 'html':
+            s += '<table class="table"><thead>\n'
+            s += '<tr><th>ip</th><th>count</th><th>permanent</th><th>timestamp</th></tr>\n'
+            s += '</thead><tbody>\n'
+            for k, r in self._ip_ban_list.items():
+                s += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n'.format(k, r['count'],
+                                                                                      r.get('permanent', ''),
+                                                                                      r['timestamp'])
+            s += '</tbody></table>'
+        elif option == 'csv':
+            for k, r in self._ip_ban_list.items():
+                s += '{},{},{},{}\n'.format(k, r['count'], r.get('permanent', ''),
+                                            r['timestamp'])
+
+        return s
+
     def add(self, ip=None, url=None, reason='404', no_write=False, timestamp=None):
         """
         increment ban count ip of the current request in the banned list
@@ -673,8 +717,9 @@ class IpBan:
 
         entry['timestamp'] = timestamp
 
-        self._logger.info(
-            '{}. {} {} added/updated ban list. Count: {}'.format(reason, ip, url, entry['count']))
+        if not self.init:
+            self._logger.info(
+                '{}. {} {} added/updated ban list. Count: {}'.format(reason, ip, url, entry['count']))
         if not no_write:
             self.ip_record.write(ip, count=entry['count'])
         return True
@@ -737,10 +782,10 @@ if __name__ == '__main__':
     secret_key = 'abscdefghijklj430urojfdshfdsoih'
     my_ip = '127.0.0.1'
     test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='/tmp/flask-ip-ban-test-app',
-                        ip_header='X_IP_HEADER',
+                        # ip_header='X_IP_HEADER',
                         abuse_IPDB_config=dict(
                             key='00d3a5644311310573bdc5c98504981c6c87953abbd2d5b01f052459e7f40d800e5b0d08952d9a27',
-                            report=True, load=True))
+                            report=False, load=False))
     app = Flask(__name__)
 
 
@@ -768,6 +813,11 @@ if __name__ == '__main__':
         return '<h1>You are now blocked</h1>'
 
 
+    @app.route('/display')
+    def route_display():
+        return test_ip_ban.display()
+
+
     @app.route('/unblock')
     def route_unblock():
         removed = test_ip_ban.remove(my_ip)
@@ -777,36 +827,37 @@ if __name__ == '__main__':
     @app.route('/')
     def route_hello():
         js = """var interval = null;
-        function startExercise(){
-            interval = setInterval(()=>{
-            const urls = ['/ban','/ban_perm','/remove','/doesnotexist','/unblock','/sftp-config.json'];
-            const r = Math.floor(Math.random()*urls.length);
-            fetch(urls[r]).then(response=>document.getElementById('message').innerText=urls[r] + '-' + response.status);
-        },1500)
-        }
-        function stopExercise(){
-            clearInterval(interval);
-        }
-        """
+    function startExercise(){
+        interval = setInterval(()=>{
+        const urls = ['/ban','/ban_perm','/remove','/doesnotexist','/unblock','/sftp-config.json'];
+        const r = Math.floor(Math.random()*urls.length);
+        fetch(urls[r]).then(response=>document.getElementById('message').innerText=urls[r] + '-' + response.status);
+    },1500)
+    }
+    function stopExercise(){
+        clearInterval(interval);
+    }
+    """
 
         return '''<h1>ip ban app - timeout: 20 seconds - ban count: 4</h1>
-        <p id='message'></p>
-        <a href='/ban'>Block {ip}</a>
-        <a href='/ban_perm'>Block perm {ip}</a>
-        <a href='/remove'>remove {ip}</a>
-        <a href='/doesnotexist'>404</a>
-        <a href='/unblock'>unblock</a>
-        <a href='/sftp-config.json'>nuisance url</a>
-        <script>{js}</script>
-        <br>
-        <button onclick="startExercise()">Start exercise</button>
-        <button onclick="stopExercise()">Cancel exercise</button>
-        '''.format(js=js, ip=my_ip)
+    <p id='message'></p>
+    <a href='/ban'>Block {ip}</a>
+    <a href='/ban_perm'>Block perm {ip}</a>
+    <a href='/remove'>remove {ip}</a>
+    <a href='/doesnotexist'>404</a>
+    <a href='/unblock'>unblock</a>
+    <a href='/sftp-config.json'>nuisance url</a>
+    <script>{js}</script>
+    <br>
+    <button onclick="startExercise()">Start exercise</button>
+    <button onclick="stopExercise()">Cancel exercise</button>
+    '''.format(js=js, ip=my_ip)
 
 
     app.secret_key = secret_key
     test_ip_ban.init_app(app)
     test_ip_ban.url_pattern_add('/unblock', match_type='string')
+    test_ip_ban.url_pattern_add('/display', match_type='string')
     test_ip_ban.load_nuisances()
     app.logger.setLevel(logging.INFO)
 
