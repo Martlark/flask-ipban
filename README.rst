@@ -52,10 +52,10 @@ Options
 -  ``ban_seconds``, default ``60``, Number of seconds ip address is banned.
 -  ``persist``, default ``False``, Persist ban list between restarts, using records in the report_dir folder.
 -  ``report_dir``, default ``None``, Override the location of persistence and report files.
--  ``ipc``, default ``True``, Allow multiple instances of ip_ban to cross communicate using the ``report_dir``.
+-  ``ipc``, default ``False``, Allow multiple instances of ip_ban to cross communicate using the ``report_dir``.
 -  ``secret_key``, default ``flask secret key``, Key to sign reports in the ``report_dir``.
 -  ``ip_header``, default ``None``, Optional name of request header that contains the ip for use behind proxies when in a docker/kube hosted env.
-
+-  ``abuse_IPDB_config``, default ``None``, config {key=,report=False,load=False} to a AbuseIPDB.com account.  Blocked ip addresses via url nuisance matching will be reported.
 
 Config by env variable overrides options
 ########################################
@@ -165,13 +165,18 @@ See the nuisance.yaml file in the source for formatting and details.
 IPC and persistence
 -------------------
 
-By default ip_ban writes out each 404/ban event to a file in the ``record_dir`` folder, which has a default in linux of
+When you have multiple applications or processes serving a web application it can be handy to share
+any abuse ip between processes.  The ipc option allows this.
+
+Set ipc to True to allow writing out each 404/ban event to a file in the ``record_dir`` folder, which has a default in linux of
 ``/tmp/flask-ip-ban``.  This folder has to be writable by the process running your app.  Obviously if you use multiple
 different apps they can share ip_ban reporting.  Each record is signed with the ``secret_key``, so this must be shared
 amongst all applications that use the ``record_dir`` folder.  The ``secret_key`` is by default the flask secret key.
 
+This folder and secret key is also used by the persistence feature.
+
 Only ip records using the `block`, `add` and `remove` methods or by 404; are persisted or shared.  Any whitelisting or 
-pattern bans are not presisted/shared and must be done for each instance of your application.
+pattern bans are not persisted/shared and must be done for each instance of your application.
 
 IP Header
 ---------
@@ -185,6 +190,21 @@ so that ip-ban can find what it really is.  For apache:
     ``ProxyPass / http://localhost:8080/``
 
     ``ProxyPassReverse / http://localhost:8080/``
+
+
+Abuse IPDB
+----------
+
+You can setup so that flask-ipban will auto report url hacking attempts to the Abuse IPDB.  Or you can
+load the Abuse IPDB list of blocked ip address on start.  Warning!  This takes a while to load 10000 records.
+
+*Config*
+
+abuse_IPDB_config = {key=,report=False,load=False}
+
+* key - your abuse IPDB api v2 key
+* report - True/False (default is False) - report hack attempts to the DB.
+* load - True/False (default is False) - load and block already blocked ip addresses from the DB on startup
 
 
 Licensing

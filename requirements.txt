@@ -1,4 +1,4 @@
-flask>=1.0.5
+flask>=1.0.6
 pytest
 tox
 twine

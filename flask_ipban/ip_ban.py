@@ -410,8 +410,8 @@ class IpBan:
 
     """
 
-    def __init__(self, app=None, ban_count=20, ban_seconds=3600, persist=False, record_dir=None, ipc=True,
-                 secret_key=None, ip_header=None, abuse_IPDB_config={}):
+    def __init__(self, app=None, ban_count=20, ban_seconds=3600, persist=False, record_dir=None, ipc=False,
+                 secret_key=None, ip_header=None, abuse_IPDB_config=None):
         """
         start
         :param app: (optional when using init_app) flask application with logger defined
@@ -435,7 +435,7 @@ class IpBan:
         self._logger = None
         self.abuse_reporter = None
         self.ip_header = ip_header
-        self.abuse_IPDB_config = abuse_IPDB_config
+        self.abuse_IPDB_config = abuse_IPDB_config or {}
         self.init = True
 
         self.ip_record = IpRecord(self, record_dir, persist, ipc, secret_key)
