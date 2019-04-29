@@ -498,11 +498,15 @@ class IpBan:
                 entry['timestamp'] = timestamp
                 entry['count'] = self.ban_count * 2
                 entry['permanent'] = entry.get('permanent') or permanent  # retain permanent on extra blocks
+
+                if not (no_write or self.init):
+                    self._logger.warning('{ip} added to ban list.'.format(ip=ip))
             else:
                 self._ip_ban_list[ip] = dict(timestamp=timestamp, count=self.ban_count * 2, permanent=permanent)
 
-            if not (no_write or self.init):
-                self._logger.warning('{ip} added to ban list.'.format(ip=ip))
+                if not (no_write or self.init):
+                    self._logger.info('{ip} updated in ban list.'.format(ip=ip))
+
             self.ip_record.remove(ip, record_types=['.remove'])
             if not no_write:
                 self.ip_record.write(ip, record_type='permanent' if permanent else 'block')
