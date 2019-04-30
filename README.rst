@@ -191,7 +191,7 @@ so that ip-ban can find what it really is.  For apache:
 
     ``ProxyPassReverse / http://localhost:8080/``
 
-Then when intializing ip_ban set the header name using the parameter ``ip_header``, eg: ip_header='X_TRUE_IP'.
+Then when initializing ip_ban set the header name using the parameter ``ip_header``, in this example: ip_header='X_TRUE_IP'.
 
 Abuse IPDB
 ----------
