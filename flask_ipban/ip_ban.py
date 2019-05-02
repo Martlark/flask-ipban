@@ -11,390 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import absolute_import
 
-
-import operator
 import os
-import random
 import re
-import tempfile
-import json
 from datetime import datetime
-
-import requests
-from itsdangerous import Signer
 
 import yaml
 from flask import request, abort
 
-
-class IpRecord:
-    """
-    class to read and write ipc messages so that ip_ban can be shared across instances and applications
-    """
-
-    def __init__(self, ip_ban, record_dir, persist, ipc, secret_key):
-        self.ip_ban = ip_ban
-        self._ip_record_timer_seconds = min(5.0, self.ip_ban.ban_seconds / 4)  # type: float
-        self._ip_record_dir = record_dir or os.path.join(tempfile.gettempdir(), 'flask-ip-ban')  # type: str
-        self._instance_id = str(random.randint(0, 999999999999))  # type: str
-        self._persist = persist
-        self._ipc = ipc
-        self._secret_key = secret_key
-        self._logger = None
-        self._signer = None
-        self._last_update_time = datetime.now()
-        self.init = True
-        self.listdir = None
-
-    def start(self, app):
-        """
-        setup the ip record db
-        if store cannot be setup then ipc will be disabled.
-        :return: True if setup correctly.
-        """
-        if not self._ipc and not self._persist:
-            return False
-
-        self._logger = app.logger
-
-        tmp_secret_key = self._secret_key or app.secret_key or app.config.get('SECRET_KEY') or 'not-very-secret-key'
-        if tmp_secret_key == 'not-very-secret-key':
-            self._logger.warning('secret_key is default of: {}'.format(tmp_secret_key))
-
-        self._signer = Signer(tmp_secret_key)
-
-        try:
-            if not os.path.isdir(self._ip_record_dir):
-                os.makedirs(self._ip_record_dir)
-
-            test_file_name = self.write('test', 'test')
-            self.safe_unlink(test_file_name)
-            if self._persist:
-                self.read_updates(force=True)
-            else:
-                self.clean()
-        except Exception as e:
-            self._logger.exception(e)
-            self._logger.error('ip record store cannot be established.  Disabling IPC.')
-            self._ipc = False
-            self.init = False
-            return False
-
-        self.init = False
-        return True
-
-    @staticmethod
-    def safe_unlink(file_name):
-        """
-        safely remove a file if it exists
-        :param file_name:
-        :return:
-        """
-        try:
-            if os.path.isfile(file_name):
-                # attempt to remove the file
-                os.unlink(file_name)
-        except Exception as ex:
-            pass
-
-    def clean(self):
-        """
-        clean out all ip record files
-        :return: None
-        """
-        for f in os.listdir(self._ip_record_dir):
-            file_name = os.path.join(self._ip_record_dir, f)
-            self.safe_unlink(file_name)
-
-    def update_from_other_instances(self):
-        """
-        Read updates from other instances every now and then
-        """
-        if not self._ipc:
-            return
-
-        elapsed = datetime.now() - self._last_update_time
-        if elapsed.seconds > self._ip_record_timer_seconds:
-            self.read_updates()
-
-    @classmethod
-    def path_clean(cls, dirty):
-        clean = ''
-        if dirty:
-            for c in dirty:
-                if c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.0123456789_':
-                    clean += c
-        return clean
-
-    def write(self, ip, record_type='add', count=0):
-        """
-        write a ip record into the store
-        :param ip: the ip to add
-        :param record_type: type of record, could be: add (default), permanent, block, remove, test
-        :param count: the list count of the add - allows adds to be communicated
-        :return:the file_name of the record or None if nothing going or can't write
-        """
-        if not self._ipc and not self._persist:
-            return
-
-        safe_ip = IpRecord.path_clean(ip)
-        file_name = os.path.join(self._ip_record_dir,
-                                 '{}-{}-{}.{}'.format(self._instance_id, safe_ip, count, record_type))
-        try:
-            if os.path.exists(file_name):
-                # touch it
-                os.utime(file_name, None)
-            else:
-                with open(file_name, 'wb') as f:
-                    f.write(self._signer.sign(ip))
-        except:
-            return
-        return file_name
-
-    def remove(self, ip, record_types):
-        """
-        Remove the given record type extensions for the given ip
-        :param ip: ip to remove
-        :param record_types: list of file extensions to remove ie: ['.add', '.remove']
-        :return:
-        """
-        if not self._ipc and not self._persist:
-            return
-
-        self._logger.debug('Removing {} for records {}'.format(ip, record_types))
-        if not self.init:
-            self.listdir = None
-
-        if not self.listdir:
-            self.listdir = []
-            for filename in os.listdir(self._ip_record_dir):
-                self.listdir.append(dict(
-                    filename=filename,
-                    full_name=os.path.join(self._ip_record_dir, filename),
-                    extension=os.path.splitext(filename)[1]))
-
-        for entry in self.listdir:
-            if '-' + ip + '-' in entry['filename'] and entry['extension'] in record_types:
-                self.safe_unlink(entry['full_name'])
-
-    def read_updates(self, force=False):
-        """
-        Read other process and persistence ip records.  Only reads records that are newer than previous run.
-        When not persisting older records will be cleaned up when > 2*ban_seconds old
-        updates the _last_update_time on exit
-        :param force: force update from older records
-        :return:
-        """
-        if not self._ipc and not self._persist:
-            return
-
-        # read records and process from oldest to youngest
-        try:
-            filename_list = [dict(filename=f, full_name=os.path.join(self._ip_record_dir, f),
-                                  mtime=datetime.fromtimestamp(
-                                      os.path.getmtime(os.path.join(self._ip_record_dir, f))))
-                             for
-                             f in os.listdir(self._ip_record_dir)]
-            filename_list = sorted(filename_list, key=operator.itemgetter('mtime'))
-        except Exception as ex:
-            # silently return if a file has been removed during enumeration
-            return
-
-        now = datetime.now()
-        for filename_entry in filename_list:
-            try:
-                filename = filename_entry['filename']
-                if not filename.startswith(self._instance_id + '-'):
-                    if os.path.isfile(filename_entry['full_name']):
-                        if filename_entry['mtime'] > self._last_update_time or force:
-                            with open(filename_entry['full_name'], 'rb') as f:
-                                signed_ip = f.readline()
-
-                            ip = self._signer.unsign(signed_ip).decode('utf-8')
-                            self._logger.debug(
-                                'Instance: {}, reading ip {} from record {}@{}'.format(self._instance_id, ip,
-                                                                                       filename, str(
-                                        filename_entry['mtime']).split('.')[0]))
-                            if filename.endswith('.add'):
-                                delta = now - filename_entry['mtime']
-                                if delta.seconds < self.ip_ban.ban_seconds:
-                                    self.ip_ban.add(ip, url=' ', no_write=True, timestamp=filename_entry['mtime'])
-                                else:
-                                    self.safe_unlink(filename_entry['full_name'])
-                            elif filename.endswith('.block'):
-                                delta = now - filename_entry['mtime']
-                                if delta.seconds < self.ip_ban.ban_seconds:
-                                    self.ip_ban.block([ip], no_write=True, timestamp=filename_entry['mtime'])
-                                else:
-                                    self.safe_unlink(filename_entry['full_name'])
-                            elif filename.endswith('.test'):
-                                self.safe_unlink(filename_entry['full_name'])
-                            elif filename.endswith('.permanent'):
-                                self.ip_ban.block([ip], permanent=True, no_write=True)
-                            elif filename.endswith('.remove'):
-                                self.ip_ban.remove(ip, no_write=True)
-                                self.remove(ip, record_types=['.block', '.permanent', '.add'])
-                            else:
-                                raise Exception(
-                                    'Instance: {}, unknown ip record type for file: {}'.format(
-                                        self._instance_id,
-                                        filename))
-                        elif not self._persist:
-                            # clean up old entry
-                            elapsed = datetime.now() - filename_entry['mtime']
-                            if elapsed.seconds > self.ip_ban.ban_seconds * 2:
-                                self.safe_unlink(filename_entry['full_name'])
-            except FileNotFoundError:
-                pass
-            except Exception as e:
-                self._logger.warning(e)
-                # attempt to remove the problematic entry
-                self.safe_unlink(filename_entry['full_name'])
-        self._last_update_time = datetime.now()
-
-
-class ExceptionLockInUse(Exception):
-    def __init__(self, message):
-        # Call the base class constructor with the parameters it needs
-        super(Exception, self).__init__(message)
-
-
-class GetLock:
-    def blank_lockf(self, file_handle, options):
-        pass
-
-    def __init__(self, lock_file_prefix=__name__):
-
-        self.lock_file_path = os.path.join(os.environ.get('TEMP', '/tmp'), lock_file_prefix + '.lock')
-
-        try:
-            fcntl = __import__('fcntl')
-            self.lockf = fcntl.lockf
-            self.LOCK_EX = fcntl.LOCK_EX
-            self.LOCK_NB = fcntl.LOCK_NB
-        except ImportError:
-            self.lockf = self.blank_lockf
-            self.LOCK_EX = 0
-            self.LOCK_NB = 0
-
-    def __enter__(self):
-        if os.path.exists(self.lock_file_path):
-            try:
-                with open(self.lock_file_path, 'w') as existing_lock_file:
-                    self.lockf(existing_lock_file, self.LOCK_EX | self.LOCK_NB)
-                os.unlink(self.lock_file_path)
-            except:
-                raise ExceptionLockInUse('lock file:{} in use'.format(self.lock_file_path))
-
-        self.lock_file = open(self.lock_file_path, 'w')
-        self.lockf(self.lock_file, self.LOCK_EX)
-
-        return self
-
-    def __exit__(self, type, value, traceback):
-        if hasattr(self, 'lock_file'):
-            self.lock_file.close()
-        if os.path.exists(self.lock_file_path):
-            os.unlink(self.lock_file_path)
-
-
-class AbuseIPDB:
-    def __init__(self, logger, ip_ban, key, report=False, load=False):
-        """
-        Report/load to AbuseIPDB.com
-        :param logger: flask logger to use
-        :param ip_ban: ip_ban instance
-        :param key: AbuseIPDB.com api key
-        :param report: True/False - report url blocks to AbuseIPDB
-        :param load:  True/False - load the AbuseIPDB blacklist
-        """
-        self.key = key
-        self.logger = logger
-        self.ip_ban = ip_ban
-        self.report = report
-        self.end_point = 'https://api.abuseipdb.com/api/v2/'
-        self.categories = [21]  # Web App Attack
-        self.lock_name = 'flask-ip-ban-abuse-ipdb-load'
-        if load:
-            self.import_black_list()
-
-    def report_ip(self, ip, reason, categories=None):
-        if not self.report:
-            return
-            """
-            # POST the submission.
-    curl https://api.abuseipdb.com/api/v2/report \
-      --data-urlencode "ip=127.0.0.1" \
-      -d categories=18,22 \
-      --data-urlencode "comment=SSH login attempts with user root." \
-      -H "Key: $YOUR_API_KEY" \
-      -H "Accept: application/json"
-    """
-
-        url = self.end_point + 'report'
-        data = json.dumps(dict(ip=ip, comment=reason, categories=','.join(map(str, categories or self.categories))))
-        headers = dict(Accept='application/json', Key=self.key)
-        try:
-            response = requests.get(url, params=data, headers=headers).content
-            self.logger.warn('reported ip {} for {}.  Response: {}'.format(ip, reason, response))
-        except Exception as e:
-            self.logger.error('Error reporting ip to {}'.format(url))
-            self.logger.exception(e)
-
-    def import_black_list(self):
-        """
-        # The -G option will convert form parameters (-d options) into query parameters.
-# The CHECK endpoint is a GET request.
-curl -G https://api.abuseipdb.com/api/v2/blacklist \
-  -d countMinimum=15 \
-  -d maxAgeInDays=60 \
-  -d confidenceMinimum=90 \
-  -H "Key: $YOUR_API_KEY" \
-  -H "Accept: application/json"
-
-  {
-  "meta": {
-    "generatedAt": "2018-12-21T16:00:04+00:00"
-  },
-  "data": [
-    {
-      "ipAddress": "5.188.10.179",
-      "totalReports": 560,
-      "abuseConfidenceScore": 100
-    },
-    {
-      "ipAddress": "185.222.209.14",
-      "totalReports": 529,
-      "abuseConfidenceScore": 100
-    },
-    {
-      "ipAddress": "191.96.249.183",
-      "totalReports": 325,
-      "abuseConfidenceScore": 100
-    },
-    ...
-  ]
-}
-
-        :return:
-        """
-        url = self.end_point + 'blacklist'
-        data = json.dumps(dict(countMinimum=15, maxAgeInDays=20, confidenceMinimum=100))
-        headers = dict(Accept='application/json', Key=self.key)
-        try:
-            with GetLock(self.lock_name):
-                response = requests.get(url, params=data, headers=headers).content
-                json_response = json.loads(response.decode('utf-8'))
-                self.logger.warn('Got ip blacklist.  Importing {} records.'.format(len(json_response['data'])))
-                ip_list = [record['ipAddress'] for record in json_response['data']]
-                self.ip_ban.block(ip_list=ip_list, no_write=False)
-        except ExceptionLockInUse:
-            self.logger.warn('Other flask-ip-ban process has import lock:{}'.format(self.lock_name))
-            return
-        except Exception as e:
-            self.logger.error('Error importing ip blacklist from: {}.  Response: {}'.format(url, response))
-            self.logger.exception(e)
+from flask_ipban.ip_record import IpRecord
+from flask_ipban.abuse_ipdb import AbuseIPDB
 
 
 class IpBan:
@@ -456,12 +83,15 @@ class IpBan:
         self.ip_record.start(app)
         self.abuse_reporter = AbuseIPDB(logger=self._logger, ip_ban=self, key=self.abuse_IPDB_config.get('key'),
                                         report=self.abuse_IPDB_config.get('report'),
-                                        load=self.abuse_IPDB_config.get('load'))
+                                        load=self.abuse_IPDB_config.get('load'),
+                                        debug=self.app.debug or self.abuse_IPDB_config.get('debug'))
         self.init = False
 
     def import_IPDB_black_list(self):
         """
-        load up a list of ip addresses in the AbuseIPDB database.  Note: free rate limit is 5 per day
+        load up a list of ip addresses in the AbuseIPDB database.
+        Note: free rate limit is 5 per day
+        Note: can take a long time for the default 10000 entries
         :return:
         """
         if self.abuse_reporter and self.abuse_IPDB_key:
@@ -703,9 +333,8 @@ class IpBan:
             if self.test_pattern_blocklist(url, ip=ip):
                 self.block([ip], no_write=no_write)
                 if not no_write and url and self.abuse_IPDB_config.get('key'):
-                    if self.app.debug:
-                        ip = '127.0.0.2'
-                    self.abuse_reporter.report_ip(ip, reason='flask_ip_ban.  URL requested:{}'.format(url))
+                    # report if this is the first time ip seen and not a report from another instance
+                    self.abuse_reporter.report_ip(ip, reason='flask_ip_ban.  Exploit URL requested:{}'.format(url))
                 return True
 
         if timestamp and timestamp > datetime.now():
@@ -788,8 +417,8 @@ if __name__ == '__main__':
     test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='/tmp/flask-ip-ban-test-app',
                         # ip_header='X_IP_HEADER',
                         abuse_IPDB_config=dict(
-                            key=os.environ.get('ABSUSE_IPDB_KEY'),
-                            report=False, load=False))
+                            key=os.environ.get('ABUSE_IPDB_KEY'),
+                            report=True, load=False, debug=True))
     app = Flask(__name__)
 
 
