@@ -39,8 +39,8 @@ class AbuseIPDB:
         self.end_point = 'https://api.abuseipdb.com/api/v2/'
         self.categories = [21]  # Web App Attack
         self.lock_name = 'flask-ip-ban-abuse-ipdb-load'
-        self.debug=debug
-        self.reported = {} # url and ip alread reported
+        self.debug = debug
+        self.reported = {}  # url and ip alread reported
         if load:
             self.import_black_list()
 
@@ -49,36 +49,47 @@ class AbuseIPDB:
             :param ip: the address being reported
             :param reason: reason for report
             :param categories: numbered list of report categories. 21 is web app attack
+            :return success code: ['already','error','ok','']
         """
         if not self.report:
-            return
+            return ''
 
         key = ip + '-' + reason
 
         if self.reported.get(key):
             self.logger.info('Already reported {}'.format(key))
-            return # already reported ip and reason combination
+            # already reported ip and reason combination
+            return 'already'
 
         if self.debug:
-            ip = '127.0.0.2'
+            # ip = '127.0.0.2' use for testing when api is rate limited
+            ip = '127.0.0.1'
 
         url = self.end_point + 'report'
-        data = json.dumps(dict(ip=ip, comment=reason, categories=','.join(map(str, categories or self.categories))))
+        data = dict(ip=ip, comment=reason, categories=','.join(map(str, categories or self.categories)))
         headers = dict(Accept='application/json', Key=self.key)
         try:
             # POST the submission.
-            #curl https://api.abuseipdb.com/api/v2/report \
+            # curl https://api.abuseipdb.com/api/v2/report \
             #  --data-urlencode "ip=127.0.0.1" \
             #  -d categories=18,22 \
             #  --data-urlencode "comment=SSH login attempts with user root." \
             #  -H "Key: $YOUR_API_KEY" \
             #  -H "Accept: application/json"
-            response = requests.get(url, params=data, headers=headers).content
-            self.logger.warn('reported ip {} for {}.  Response: {}'.format(ip, reason, response))
-            self.reported[key] = datetime.utcnow()
+            response = requests.post(url, data=data, headers=headers).content
+            json_response = json.loads(response)
+            if json_response.get('data'):
+                self.reported[key] = datetime.utcnow()
+                self.logger.warn('reported ip {} for {}.  ok: {}'.format(ip, reason, json_response.get('data')))
+            else:
+                self.logger.error('reported ip {} for {}.  Error: {}'.format(ip, reason, response))
+                return 'error'
+
         except Exception as e:
             self.logger.error('Error reporting ip to {}'.format(url))
             self.logger.exception(e)
+            return 'error'
+        return 'ok'
 
     def import_black_list(self):
         """
