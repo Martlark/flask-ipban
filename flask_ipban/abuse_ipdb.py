@@ -48,7 +48,7 @@ class AbuseIPDB:
         """
             :param ip: the address being reported
             :param reason: reason for report
-            :param categories: numbered list of report categories. 21 is web app attack
+            :param categories: numbered list of report categories. default 21 is web app attack
             :return success code: ['already','error','ok','']
         """
         if not self.report:

@@ -37,7 +37,7 @@ class IpBan:
 
     """
 
-    def __init__(self, app=None, ban_count=20, ban_seconds=3600, persist=False, record_dir=None, ipc=False,
+    def __init__(self, app=None, ban_count=20, ban_seconds=3600*24, persist=False, record_dir=None, ipc=False,
                  secret_key=None, ip_header=None, abuse_IPDB_config=None):
         """
         start
@@ -334,7 +334,7 @@ class IpBan:
                 self.block([ip], no_write=no_write)
                 if not no_write and url and self.abuse_IPDB_config.get('key'):
                     # report if this is the first time ip seen and not a report from another instance
-                    self.abuse_reporter.report_ip(ip, reason='flask_ip_ban.  Exploit URL requested:{}'.format(url))
+                    self.abuse_reporter.report_ip(ip, reason='Flask-IPban - exploit URL requested:{}'.format(url))
                 return True
 
         if timestamp and timestamp > datetime.now():

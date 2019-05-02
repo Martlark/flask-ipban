@@ -3,17 +3,18 @@ IpBan: HTTP spam security for Flask
 
 |PyPI Version|
 
-IpBan is a Flask extension that can help protect against ip locations spamming url requests
-against unknown pages.  Often this is to search for security issues.
+IpBan is a Flask extension that can help protect against ip sources spamming url requests
+against unknown pages or attempts to exploit URLs.  Often this is to search for security issues.
 
 The default configuration:
 
 - 20 attempts before ban
-- 1 hour blocking period
+- 1 day blocking period
 
 Once an ip address is banned any attempt to access a web address on your site from that ip will
-result in a 403 forbidden status response.  After the default 1 hour blocking period of no access
-attempts the ban will be lifted.  Any access attempt during the ban period will extend the ban period.
+result in a 403 forbidden status response.  After the default 1 day blocking period of no access
+attempts the ban will be lifted.  Any access attempt during the ban period will extend the ban period
+by the `ban_seconds` amount.
 
 Ip addresses can be entered for banning by the api.
 
@@ -49,13 +50,13 @@ Options
 
 -  ``app``,  Flask application to monitor.  Use ip_ban.init_app(app) to intialise later on.
 -  ``ban_count``, default ``20``, Number of observations before banning.
--  ``ban_seconds``, default ``60``, Number of seconds ip address is banned.
+-  ``ban_seconds``, default ``3600*24 (one day)``, Number of seconds ip address is banned.
 -  ``persist``, default ``False``, Persist ban list between restarts, using records in the report_dir folder.
 -  ``report_dir``, default ``None``, Override the location of persistence and report files.
 -  ``ipc``, default ``False``, Allow multiple instances of ip_ban to cross communicate using the ``report_dir``.
 -  ``secret_key``, default ``flask secret key``, Key to sign reports in the ``report_dir``.
 -  ``ip_header``, default ``None``, Optional name of request header that contains the ip for use behind proxies when in a docker/kube hosted env.
--  ``abuse_IPDB_config``, default ``None``, config {key=,report=False,load=False} to a AbuseIPDB.com account.  Blocked ip addresses via url nuisance matching will be reported.
+-  ``abuse_IPDB_config``, default ``None``, config {key=, report=False, load=False} to a AbuseIPDB.com account.  Blocked ip addresses via url nuisance matching will be reported.
 
 Config by env variable overrides options
 ########################################
@@ -70,7 +71,7 @@ Methods
 -------
 
 -  ``init_app(app)`` - Initialise and start ip_ban with the given Flask application.
--  ``block(ip_address, permanent=False)`` - block the specific address optionally forever
+-  ``block(ip_address, permanent=False)`` - block the specific address, optionally forever
 -  ``add(ip=None, url=None, reason='404')`` - increase the observations for the current request ip or given ip address
 
 Example for add:
@@ -196,16 +197,19 @@ Then when initializing ip_ban set the header name using the parameter ``ip_heade
 Abuse IPDB
 ----------
 
-You can setup so that flask-ipban will auto report url hacking attempts to the Abuse IPDB.  Or you can
-load the Abuse IPDB list of blocked ip address on start.  Warning!  This takes a while to load 10000 records.
+see: https://docs.abuseipdb.com/#introduction
+
+You can setup flask-ipban so it will auto report url hacking attempts to the Abuse IPDB.  Or you can
+load the Abuse IPDB list of blocked ip address on start.  Warning!  Loading takes a while for the default 10000 records.
 
 *Config*
 
-abuse_IPDB_config = {key=,report=False,load=False}
+abuse_IPDB_config = {key=, report=False, load=False, debug=False}
 
 * key - your abuse IPDB api v2 key
 * report - True/False (default is False) - report hack attempts to the DB.
 * load - True/False (default is False) - load and block already blocked ip addresses from the DB on startup
+* debug - True/False (default is False) - debug mode, uses ip 127.0.0.1.
 
 
 Licensing

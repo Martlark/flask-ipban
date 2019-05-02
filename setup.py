@@ -13,22 +13,22 @@
 # limitations under the License.
 
 from codecs import open
-
 from setuptools import setup
 
-long_description = open('README.rst', 'r', encoding='utf-8').read()
+VERSION = '1.0.8'
+LONG_DESCRIPTION = open('README.rst', 'r', encoding='utf-8').read()
 
 setup(
     name='flask-ipban',
 
-    version='1.0.7',
+    version=VERSION,
 
     description='URL spam security for Flask.',
-    long_description=open('README.rst','r',encoding='utf-8').read(),
+    long_description=LONG_DESCRIPTION,
     long_description_content_type='text/x-rst',
 
     url='https://github.com/Martlark/flask-ipban',
-    download_url='https://github.com/Martlark/flask-ipban/archive/1.0.7.tar.gz',
+    download_url='https://github.com/Martlark/flask-ipban/archive/{version}.tar.gz'.format(VERSION),
 
     author='Andrew Rowe',
     author_email='rowe.andrew.d@gmail.com',
@@ -61,5 +61,5 @@ setup(
 
     packages=['flask_ipban'],
     include_package_data=True,
-    install_requires=['flask>=0.11','pyyaml', 'itsdangerous', 'requests'],
+    install_requires=['flask>=0.11', 'pyyaml', 'itsdangerous', 'requests'],
 )
