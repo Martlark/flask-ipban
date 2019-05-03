@@ -28,7 +28,7 @@ setup(
     long_description_content_type='text/x-rst',
 
     url='https://github.com/Martlark/flask-ipban',
-    download_url='https://github.com/Martlark/flask-ipban/archive/{version}.tar.gz'.format(VERSION),
+    download_url='https://github.com/Martlark/flask-ipban/archive/{version}.tar.gz'.format(version=VERSION),
 
     author='Andrew Rowe',
     author_email='rowe.andrew.d@gmail.com',
