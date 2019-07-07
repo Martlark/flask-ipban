@@ -36,6 +36,7 @@ class TestIpBan(unittest.TestCase):
         self.app = flask.Flask(__name__)
         self.ban_seconds = 2
         self.ip_ban = IpBan(self.app, ban_seconds=self.ban_seconds, ban_count=5, secret_key='yo-yo-yo', ipc=False)
+        self.ip_ban.ip_whitelist_remove(localhost)
         self.client = self.app.test_client()
 
         self.app.route('/')(hello_world)
@@ -58,8 +59,8 @@ class TestIpBan(unittest.TestCase):
         test_url = '/no_exist'
         self.assertTrue(re.match(test_pattern, test_url + '/123'))
         self.assertFalse(re.match(test_pattern, test_url))
-
-        self.assertEqual(self.ip_ban.url_pattern_add(test_pattern), 1)
+        existing_count = len(self.ip_ban._url_whitelist_patterns)
+        self.assertEqual(self.ip_ban.url_pattern_add(test_pattern), existing_count + 1)
         for x in range(self.ip_ban.ban_count * 2):
             self.client.get('{}/{}'.format(test_url, x))
         response = self.client.get('/')
@@ -76,7 +77,8 @@ class TestIpBan(unittest.TestCase):
     def testUrlWhitelistString(self):
         test_url = '/no_exist'
 
-        self.assertEqual(self.ip_ban.url_pattern_add(test_url, 'string'), 1)
+        existing_count = len(self.ip_ban._url_whitelist_patterns)
+        self.assertEqual(self.ip_ban.url_pattern_add(test_url, 'string'), existing_count + 1)
         for x in range(self.ip_ban.ban_count * 2):
             response = self.client.get('{}?{}'.format(test_url, x))
             self.assertEqual(response.status_code, 404)

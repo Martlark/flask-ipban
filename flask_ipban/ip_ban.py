@@ -37,7 +37,7 @@ class IpBan:
 
     """
 
-    def __init__(self, app=None, ban_count=20, ban_seconds=3600*24, persist=False, record_dir=None, ipc=False,
+    def __init__(self, app=None, ban_count=20, ban_seconds=3600 * 24, persist=False, record_dir=None, ipc=False,
                  secret_key=None, ip_header=None, abuse_IPDB_config=None):
         """
         start
@@ -54,9 +54,16 @@ class IpBan:
         self.ban_count = int(os.environ.get('IP_BAN_LIST_COUNT', ban_count))  # type: int
         self.ban_seconds = int(os.environ.get('IP_BAN_LIST_SECONDS', ban_seconds))  # type: int
 
-        self._ip_whitelist = {}
+        self._ip_whitelist = {'127.0.0.1': True}
+        # self._ip_whitelist = {}
         self._ip_ban_list = {}
-        self._url_whitelist_patterns = {}
+        # initialise with well known search bot links
+        self._url_whitelist_patterns = {
+            '^/.well-known/': dict(pattern=re.compile('^/.well-known'), match_type='regex'),
+            '/favicon.ico': dict(pattern=re.compile(''), match_type='string'),
+            '/robots.txt': dict(pattern=re.compile(''), match_type='string'),
+            '/ads.txt': dict(pattern=re.compile(''), match_type='string'),
+        }
         self._url_blocklist_patterns = {}
         self.app = None
         self._logger = None
@@ -143,6 +150,11 @@ class IpBan:
         return len(self._ip_ban_list)
 
     def get_ip(self):
+        """
+        return the ip for the current request from flask or from
+        the request header if behind a proxy
+        :return:
+        """
         ip = None
         if self.ip_header:
             ip = request.headers.get(self.ip_header)
@@ -310,7 +322,7 @@ class IpBan:
         """
         increment ban count ip of the current request in the banned list
         :return:
-        :param ip: optional ip to add
+        :param ip: optional ip to add (ip ban will by default use current ip)
         :param url: optional url to display/store
         :param reason: optional reason for ban, default is 404
         :param no_write: do not write out to record file
@@ -496,6 +508,7 @@ if __name__ == '__main__':
     test_ip_ban.init_app(app)
     test_ip_ban.url_pattern_add('/unblock', match_type='string')
     test_ip_ban.url_pattern_add('/display', match_type='string')
+    test_ip_ban.ip_whitelist_remove('127.0.0.1')
     test_ip_ban.load_nuisances()
     app.logger.setLevel(logging.INFO)
 
