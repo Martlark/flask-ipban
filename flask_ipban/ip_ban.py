@@ -37,10 +37,13 @@ class IpBan:
 
     """
 
+    VERSION = '1.0.11'
+
     def __init__(self, app=None, ban_count=20, ban_seconds=3600 * 24, persist=False, record_dir=None, ipc=False,
                  secret_key=None, ip_header=None, abuse_IPDB_config=None):
         """
         start
+
         :param app: (optional when using init_app) flask application with logger defined
         :param ban_count: (optional) number of observations before ban
         :param ban_seconds: (optional) number minutes of silence before ban rescinded (0 is never rescind)
@@ -80,6 +83,7 @@ class IpBan:
     def init_app(self, app):
         """
         initialise using app as parameter
+
         :param app: flask app with logger defined
         :return:
         """
@@ -99,6 +103,7 @@ class IpBan:
         load up a list of ip addresses in the AbuseIPDB database.
         Note: free rate limit is 5 per day
         Note: can take a long time for the default 10000 entries
+
         :return:
         """
         if self.abuse_reporter and self.abuse_IPDB_key:
@@ -107,6 +112,7 @@ class IpBan:
     def _after_request(self, response):
         """
         method to call after a request to allow recording of 404 errors
+
         :param response:
         :return:
         """
@@ -117,6 +123,7 @@ class IpBan:
     def block(self, ip_list, permanent=False, no_write=False, timestamp=None):
         """
         add a list of ip address to the block list
+
         :param ip_list: list of ip addresses to block
         :param permanent: (optional) True=do not allow entries to expire
         :param no_write: do not write an _ip_record
@@ -153,6 +160,7 @@ class IpBan:
         """
         return the ip for the current request from flask or from
         the request header if behind a proxy
+
         :return:
         """
         ip = None
@@ -163,6 +171,7 @@ class IpBan:
     def test_pattern_blocklist(self, url, ip=None):
         """
         return true if the url or ip pattern matches an existing block
+
         :param url: the url to check
         :param ip: (optional) an ip to check
         :return:
@@ -186,6 +195,7 @@ class IpBan:
         """
         raise 403 exception if ip in request has made too many 404 or failed login attempts
         checks url, blocklist and ip lists
+
         """
 
         self.ip_record.update_from_other_instances()
@@ -218,6 +228,7 @@ class IpBan:
     def ip_whitelist_add(self, ip):
         """
         add the ip to the list of ips to whitelist
+
         :param ip: the ip to add
         :return: number of entries in the ip whitelist
         """
@@ -227,6 +238,7 @@ class IpBan:
     def ip_whitelist_remove(self, ip):
         """
         remove an entry from the ip whitelist
+
         :param ip: address to remove
         :return: True if found and removed
         """
@@ -238,6 +250,7 @@ class IpBan:
     def url_pattern_add(self, url_pattern, match_type='regex'):
         """
         add or replace the pattern to the list of url patterns to ignore
+
         :param url_pattern: regex pattern to match with requested url
         :param match_type: string or regex - determines the pattern matching scheme
         :return: length of the whitelist
@@ -259,6 +272,7 @@ class IpBan:
     def url_block_pattern_add(self, url_pattern, match_type='regex'):
         """
         add or replace the pattern to the list of url patterns to block
+
         :param match_type: regex or string - determines the match strategy to use
         :param url_pattern: regex pattern to match with requested url
         :return: length of the blocklist
@@ -281,6 +295,7 @@ class IpBan:
     def _is_excluded(self, ip=None, url=None):
         """
         return true if this ip or url should not be checked
+
         :return: true if no checking required
         """
 
@@ -321,6 +336,7 @@ class IpBan:
     def add(self, ip=None, url=None, reason='404', no_write=False, timestamp=None):
         """
         increment ban count ip of the current request in the banned list
+
         :return:
         :param ip: optional ip to add (ip ban will by default use current ip)
         :param url: optional url to display/store
@@ -372,6 +388,7 @@ class IpBan:
     def remove(self, ip, no_write=False):
         """
         remove from the ban list
+
         :param ip: ip to remove
         :param no_write: do not write a remove record.  Prevents self dealing
         :return True if entry removed
@@ -393,6 +410,7 @@ class IpBan:
         load a yaml file of nuisance urls that are commonly used by vulnerability scanners.
         Once loaded any access to one of these urls that produces a 404 will ban the source ip.
         Each call to load_nuisances will add to the current list of nuisances
+
         :param file_name: a file name of your own nuisance ips
         :return: the number of nuisances added from this file
         """

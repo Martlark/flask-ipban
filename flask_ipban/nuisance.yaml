@@ -24,9 +24,9 @@
 #
 # url strings are stripped of any parameters before checking
 #
-# php, java, .net .etc. .etc. .etc. extensions should not be handled by flask
 
 regex:
+  # php, java, .net .etc. .etc. .etc. extensions should not be handled by flask
   - .*\.action$
   - .*\.asp$
   - .*\.aspx$
@@ -50,6 +50,7 @@ regex:
   - .*\.pl$
   - .*\.py$
   - .*\.sh$
+  - .*\.sql$
   - .*\.tar$
   - .*\.war$
   - .*\.wss$
@@ -59,6 +60,7 @@ regex:
   - .*?PHPSESSID=
   - .*\/usage_201811$
   - .*\/usage_201811.html$
+  - .*\wallet.dat$
   - .*\/wp-admin\/$
   - .*netease\.com\:25$
   - \/([sf]|web|ows|mp)cgi(-bin|)\/
@@ -67,6 +69,7 @@ regex:
   - \/scripts\/
   - \/HNAP1\/
   - \/WEB-INF\/
+  - \/wp-
 
 string:
   # all of these are hacking attempts by vulnerability scanners
@@ -74,6 +77,7 @@ string:
   - /_asterisk/
   - /admin/assets/js/views/login.js
   - /admin/images/cal_date_over.gif
+  - /ajax
   - /api/v1/pods
   - /bea_wls_deployment_internal
   - /HNAP1/
@@ -88,7 +92,10 @@ string:
   - /phpmyadmin/
   - /phpmyadmin0/
   - /pma/
+  - /remote/login
   - /sftp-config.json
+  - /solr/
+  - /TP/public/index.php
   - /sql/
   - /temp/wp-admin/
   - /templates/system/css/system.css

@@ -197,13 +197,11 @@ class TestIpBan(unittest.TestCase):
         # test blocked extensions
         for e in ['php', 'jsp', 'aspx', 'do', 'cgi']:
             self.assertTrue(self.ip_ban.test_pattern_blocklist('/regextest/page.{}'.format(e)), e)
-
-        # and with parameters
-        for e in ['php', 'jsp', 'aspx', 'do', 'cgi']:
+            # and with parameters
             self.assertTrue(self.ip_ban.test_pattern_blocklist('/regextest/page.{e}?extension={e}'.format(e=e)), e)
 
         # test blocked url strings and patterns
-        for e in ['/admin/assets/js/views/login.js', '/vip163mx00.mxmail.netease.com:25', '/manager/html']:
+        for e in ['/admin/assets/js/views/login.js', '/vip163mx00.mxmail.netease.com:25', '/manager/html', '/wp-login.php']:
             self.assertTrue(self.ip_ban.test_pattern_blocklist(e), e)
 
         # test blocked ip
