@@ -44,6 +44,7 @@ class IpRecord:
         """
         setup the ip record db
         if store cannot be setup then ipc will be disabled.
+
         :return: True if setup correctly.
         """
         if not self._ipc and not self._persist:
@@ -81,28 +82,35 @@ class IpRecord:
     def safe_unlink(file_name):
         """
         safely remove a file if it exists
+
         :param file_name:
-        :return:
+        :return: True if actually deleted.
         """
         try:
             if os.path.isfile(file_name):
                 # attempt to remove the file
                 os.unlink(file_name)
+                return True
         except Exception as ex:
-            pass
+            return False
 
     def clean(self):
         """
         clean out all ip record files
-        :return: None
+
+        :return: number cleaned
         """
+        cleaned = 0
         for f in os.listdir(self._ip_record_dir):
             file_name = os.path.join(self._ip_record_dir, f)
-            self.safe_unlink(file_name)
+            if self.safe_unlink(file_name):
+                cleaned += 1
+        return cleaned
 
     def update_from_other_instances(self):
         """
         Read updates from other instances every now and then
+
         """
         if not self._ipc:
             return
@@ -113,6 +121,12 @@ class IpRecord:
 
     @classmethod
     def path_clean(cls, dirty):
+        """
+        make a path without funny characters
+
+        :param dirty:
+        :return:
+        """
         clean = ''
         if dirty:
             for c in dirty:
@@ -123,6 +137,7 @@ class IpRecord:
     def write(self, ip, record_type='add', count=0):
         """
         write a ip record into the store
+
         :param ip: the ip to add
         :param record_type: type of record, could be: add (default), permanent, block, remove, test
         :param count: the list count of the add - allows adds to be communicated
@@ -148,6 +163,7 @@ class IpRecord:
     def remove(self, ip, record_types):
         """
         Remove the given record type extensions for the given ip
+
         :param ip: ip to remove
         :param record_types: list of file extensions to remove ie: ['.add', '.remove']
         :return:
@@ -176,6 +192,7 @@ class IpRecord:
         Read other process and persistence ip records.  Only reads records that are newer than previous run.
         When not persisting older records will be cleaned up when > 2*ban_seconds old
         updates the _last_update_time on exit
+
         :param force: force update from older records
         :return:
         """

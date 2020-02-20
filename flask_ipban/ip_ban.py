@@ -146,7 +146,8 @@ class IpBan:
                 if not (no_write or self.init):
                     self._logger.warning('{ip} added to ban list.'.format(ip=ip))
             else:
-                self._ip_ban_list[ip] = dict(timestamp=timestamp, count=self.ban_count * 2, permanent=permanent)
+                self._ip_ban_list[ip] = dict(timestamp=timestamp, count=self.ban_count * 2, permanent=permanent,
+                                             url='block')
 
                 if not (no_write or self.init):
                     self._logger.info('{ip} updated in ban list.'.format(ip=ip))
@@ -319,11 +320,12 @@ class IpBan:
         s = ''
         if option == 'html':
             s += '<table class="table"><thead>\n'
-            s += '<tr><th>ip</th><th>count</th><th>permanent</th><th>timestamp</th></tr>\n'
+            s += '<tr><th>ip</th><th>count</th><th>permanent</th><th>url</th><th>timestamp</th></tr>\n'
             s += '</thead><tbody>\n'
             for k, r in self._ip_ban_list.items():
-                s += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n'.format(k, r['count'],
+                s += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n'.format(k, r['count'],
                                                                                       r.get('permanent', ''),
+                                                                                      r.get('url', ''),
                                                                                       r['timestamp'])
             s += '</tbody></table>'
         elif option == 'csv':
@@ -444,7 +446,7 @@ if __name__ == '__main__':
 
     secret_key = 'abscdefghijklj430urojfdshfdsoih'
     my_ip = '127.0.0.1'
-    test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='/tmp/flask-ip-ban-test-app',
+    test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='.flask-ip-ban-test-app',
                         # ip_header='X_IP_HEADER',
                         abuse_IPDB_config=dict(
                             key=os.environ.get('ABUSE_IPDB_KEY'),
@@ -480,6 +482,10 @@ if __name__ == '__main__':
     def route_display():
         return test_ip_ban.display()
 
+    @app.route('/clean')
+    def route_clean():
+        return str(test_ip_ban.ip_record.clean())
+
 
     @app.route('/favicon.ico')
     def route_favicon():
@@ -500,10 +506,15 @@ if __name__ == '__main__':
         const urls = ['/ban','/ban_perm','/remove','/doesnotexist','/unblock','/sftp-config.json'];
         const r = Math.floor(Math.random()*urls.length);
         fetch(urls[r]).then(response=>document.getElementById('message').innerText=urls[r] + '-' + response.status);
+        fetch('/display').then(response=>response.text()).then(text=>document.getElementById('display').innerHTML=text);
     },1500)
     }
     function stopExercise(){
         clearInterval(interval);
+    }
+    function stopExerciseClear(){
+        clearInterval(interval);
+        fetch('/clean').then(response=>response.text()).then(text=>document.getElementById('message').innerText=text);
     }
     """
 
@@ -519,12 +530,15 @@ if __name__ == '__main__':
     <br>
     <button onclick="startExercise()">Start exercise</button>
     <button onclick="stopExercise()">Cancel exercise</button>
+    <button onclick="stopExerciseClear()">Cancel exercise and clear perm</button>
+    <div id='display'></div>
     '''.format(js=js, ip=my_ip)
 
 
     app.secret_key = secret_key
     test_ip_ban.init_app(app)
     test_ip_ban.url_pattern_add('/unblock', match_type='string')
+    test_ip_ban.url_pattern_add('/clean', match_type='string')
     test_ip_ban.url_pattern_add('/display', match_type='string')
     test_ip_ban.ip_whitelist_remove('127.0.0.1')
     test_ip_ban.load_nuisances()
@@ -533,4 +547,4 @@ if __name__ == '__main__':
     port = 8887
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='localhost', port=port, debug=True)
