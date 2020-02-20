@@ -120,7 +120,7 @@ class IpBan:
             self.add()
         return response
 
-    def block(self, ip_list, permanent=False, no_write=False, timestamp=None):
+    def block(self, ip_list, permanent=False, no_write=False, timestamp=None, url='block'):
         """
         add a list of ip address to the block list
 
@@ -128,6 +128,7 @@ class IpBan:
         :param permanent: (optional) True=do not allow entries to expire
         :param no_write: do not write an _ip_record
         :param timestamp; use this timestamp instead of now()
+        :param url: url or reason to block
         :returns number of entries in the block list
         """
         if not isinstance(ip_list, list):
@@ -147,7 +148,7 @@ class IpBan:
                     self._logger.warning('{ip} added to ban list.'.format(ip=ip))
             else:
                 self._ip_ban_list[ip] = dict(timestamp=timestamp, count=self.ban_count * 2, permanent=permanent,
-                                             url='block')
+                                             url=url)
 
                 if not (no_write or self.init):
                     self._logger.info('{ip} updated in ban list.'.format(ip=ip))
@@ -361,7 +362,7 @@ class IpBan:
         # or existing entry has expired
         if not entry or (entry and entry.get('count', 0) < self.ban_count):
             if self.test_pattern_blocklist(url, ip=ip):
-                self.block([ip], no_write=no_write)
+                self.block([ip], no_write=no_write, reason=url)
                 if not no_write and url and self.abuse_IPDB_config.get('key'):
                     # report if this is the first time ip seen and not a report from another instance
                     self.abuse_reporter.report_ip(ip, reason='Flask-IPban - exploit URL requested:{}'.format(url))
