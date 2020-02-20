@@ -65,6 +65,7 @@ regex:
   - .*netease\.com\:25$
   - \/([sf]|web|ows|mp)cgi(-bin|)\/
   - \/bin\/
+  - \/cgi-bin\/
   - \/htbin\/
   - \/scripts\/
   - \/HNAP1\/
