@@ -215,7 +215,7 @@ abuse_IPDB_config = {key=, report=False, load=False, debug=False}
 Release History
 ---------------
 
-1.0.11 - Remove reason= which did nothing.  Add url to report table.  Add more nuisances.  Add release history.
+1.0.13 - Remove reason= which did nothing.  Add url to report table.  Add more nuisances.  Add release history.
 
 Licensing
 ---------
