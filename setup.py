@@ -15,7 +15,7 @@
 from codecs import open
 from setuptools import setup
 
-VERSION = '1.0.9'
+VERSION = '1.0.11'
 LONG_DESCRIPTION = open('README.rst', 'r', encoding='utf-8').read()
 
 setup(
@@ -51,6 +51,7 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
 
         'Operating System :: POSIX',
         'Operating System :: MacOS',

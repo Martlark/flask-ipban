@@ -64,3 +64,4 @@ target/
 .idea
 venv*/
 
+flask_ipban/.flask-ip-ban-test-app

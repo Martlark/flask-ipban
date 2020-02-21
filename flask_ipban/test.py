@@ -119,11 +119,11 @@ class TestIpBan(unittest.TestCase):
     def testAdd(self):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
-        self.ip_ban.add(ip=localhost, url='/', reason='spite')
+        self.ip_ban.add(ip=localhost, url='/')
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         for x in range(self.ip_ban.ban_count + 1):
-            self.ip_ban.add(ip=localhost, url='/', reason='spite')
+            self.ip_ban.add(ip=localhost, url='/')
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
 
@@ -197,13 +197,12 @@ class TestIpBan(unittest.TestCase):
         # test blocked extensions
         for e in ['php', 'jsp', 'aspx', 'do', 'cgi']:
             self.assertTrue(self.ip_ban.test_pattern_blocklist('/regextest/page.{}'.format(e)), e)
-
-        # and with parameters
-        for e in ['php', 'jsp', 'aspx', 'do', 'cgi']:
+            # and with parameters
             self.assertTrue(self.ip_ban.test_pattern_blocklist('/regextest/page.{e}?extension={e}'.format(e=e)), e)
 
         # test blocked url strings and patterns
-        for e in ['/admin/assets/js/views/login.js', '/vip163mx00.mxmail.netease.com:25', '/manager/html']:
+        for e in ['/admin/assets/js/views/login.js', '/vip163mx00.mxmail.netease.com:25', '/manager/html',
+                  '/wp-login.php']:
             self.assertTrue(self.ip_ban.test_pattern_blocklist(e), e)
 
         # test blocked ip
@@ -232,3 +231,8 @@ class TestIpBan(unittest.TestCase):
         self.assertTrue(self.ip_ban.remove(localhost))
         response = self.client.get('/')
         self.assertEqual(200, response.status_code)
+
+
+if __name__ == '__main__':
+    runner = unittest.TextTestRunner(failfast=True)
+    runner.run()

@@ -37,10 +37,13 @@ class IpBan:
 
     """
 
+    VERSION = '1.0.11'
+
     def __init__(self, app=None, ban_count=20, ban_seconds=3600 * 24, persist=False, record_dir=None, ipc=False,
                  secret_key=None, ip_header=None, abuse_IPDB_config=None):
         """
         start
+
         :param app: (optional when using init_app) flask application with logger defined
         :param ban_count: (optional) number of observations before ban
         :param ban_seconds: (optional) number minutes of silence before ban rescinded (0 is never rescind)
@@ -80,6 +83,7 @@ class IpBan:
     def init_app(self, app):
         """
         initialise using app as parameter
+
         :param app: flask app with logger defined
         :return:
         """
@@ -99,6 +103,7 @@ class IpBan:
         load up a list of ip addresses in the AbuseIPDB database.
         Note: free rate limit is 5 per day
         Note: can take a long time for the default 10000 entries
+
         :return:
         """
         if self.abuse_reporter and self.abuse_IPDB_key:
@@ -107,6 +112,7 @@ class IpBan:
     def _after_request(self, response):
         """
         method to call after a request to allow recording of 404 errors
+
         :param response:
         :return:
         """
@@ -114,13 +120,15 @@ class IpBan:
             self.add()
         return response
 
-    def block(self, ip_list, permanent=False, no_write=False, timestamp=None):
+    def block(self, ip_list, permanent=False, no_write=False, timestamp=None, url='block'):
         """
         add a list of ip address to the block list
+
         :param ip_list: list of ip addresses to block
         :param permanent: (optional) True=do not allow entries to expire
         :param no_write: do not write an _ip_record
         :param timestamp; use this timestamp instead of now()
+        :param url: url or reason to block
         :returns number of entries in the block list
         """
         if not isinstance(ip_list, list):
@@ -139,7 +147,8 @@ class IpBan:
                 if not (no_write or self.init):
                     self._logger.warning('{ip} added to ban list.'.format(ip=ip))
             else:
-                self._ip_ban_list[ip] = dict(timestamp=timestamp, count=self.ban_count * 2, permanent=permanent)
+                self._ip_ban_list[ip] = dict(timestamp=timestamp, count=self.ban_count * 2, permanent=permanent,
+                                             url=url)
 
                 if not (no_write or self.init):
                     self._logger.info('{ip} updated in ban list.'.format(ip=ip))
@@ -153,6 +162,7 @@ class IpBan:
         """
         return the ip for the current request from flask or from
         the request header if behind a proxy
+
         :return:
         """
         ip = None
@@ -163,6 +173,7 @@ class IpBan:
     def test_pattern_blocklist(self, url, ip=None):
         """
         return true if the url or ip pattern matches an existing block
+
         :param url: the url to check
         :param ip: (optional) an ip to check
         :return:
@@ -186,6 +197,7 @@ class IpBan:
         """
         raise 403 exception if ip in request has made too many 404 or failed login attempts
         checks url, blocklist and ip lists
+
         """
 
         self.ip_record.update_from_other_instances()
@@ -218,6 +230,7 @@ class IpBan:
     def ip_whitelist_add(self, ip):
         """
         add the ip to the list of ips to whitelist
+
         :param ip: the ip to add
         :return: number of entries in the ip whitelist
         """
@@ -227,6 +240,7 @@ class IpBan:
     def ip_whitelist_remove(self, ip):
         """
         remove an entry from the ip whitelist
+
         :param ip: address to remove
         :return: True if found and removed
         """
@@ -238,6 +252,7 @@ class IpBan:
     def url_pattern_add(self, url_pattern, match_type='regex'):
         """
         add or replace the pattern to the list of url patterns to ignore
+
         :param url_pattern: regex pattern to match with requested url
         :param match_type: string or regex - determines the pattern matching scheme
         :return: length of the whitelist
@@ -259,6 +274,7 @@ class IpBan:
     def url_block_pattern_add(self, url_pattern, match_type='regex'):
         """
         add or replace the pattern to the list of url patterns to block
+
         :param match_type: regex or string - determines the match strategy to use
         :param url_pattern: regex pattern to match with requested url
         :return: length of the blocklist
@@ -281,6 +297,7 @@ class IpBan:
     def _is_excluded(self, ip=None, url=None):
         """
         return true if this ip or url should not be checked
+
         :return: true if no checking required
         """
 
@@ -304,11 +321,12 @@ class IpBan:
         s = ''
         if option == 'html':
             s += '<table class="table"><thead>\n'
-            s += '<tr><th>ip</th><th>count</th><th>permanent</th><th>timestamp</th></tr>\n'
+            s += '<tr><th>ip</th><th>count</th><th>permanent</th><th>url</th><th>timestamp</th></tr>\n'
             s += '</thead><tbody>\n'
             for k, r in self._ip_ban_list.items():
-                s += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n'.format(k, r['count'],
+                s += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n'.format(k, r['count'],
                                                                                       r.get('permanent', ''),
+                                                                                      r.get('url', ''),
                                                                                       r['timestamp'])
             s += '</tbody></table>'
         elif option == 'csv':
@@ -318,13 +336,13 @@ class IpBan:
 
         return s
 
-    def add(self, ip=None, url=None, reason='404', no_write=False, timestamp=None):
+    def add(self, ip=None, url=None, no_write=False, timestamp=None):
         """
         increment ban count ip of the current request in the banned list
+
         :return:
         :param ip: optional ip to add (ip ban will by default use current ip)
         :param url: optional url to display/store
-        :param reason: optional reason for ban, default is 404
         :param no_write: do not write out to record file
         :param timestamp: entry time to set
         :return True if entry added/updated
@@ -343,7 +361,7 @@ class IpBan:
         # or existing entry has expired
         if not entry or (entry and entry.get('count', 0) < self.ban_count):
             if self.test_pattern_blocklist(url, ip=ip):
-                self.block([ip], no_write=no_write)
+                self.block([ip], no_write=no_write, url=url)
                 if not no_write and url and self.abuse_IPDB_config.get('key'):
                     # report if this is the first time ip seen and not a report from another instance
                     self.abuse_reporter.report_ip(ip, reason='Flask-IPban - exploit URL requested:{}'.format(url))
@@ -364,7 +382,7 @@ class IpBan:
 
         if not self.init:
             self._logger.info(
-                '{}. {} {} added/updated ban list. Count: {}'.format(reason, ip, url, entry['count']))
+                '{} {} added/updated ban list. Count: {}'.format(ip, url, entry['count']))
         if not no_write:
             self.ip_record.write(ip, count=entry['count'])
         return True
@@ -372,6 +390,7 @@ class IpBan:
     def remove(self, ip, no_write=False):
         """
         remove from the ban list
+
         :param ip: ip to remove
         :param no_write: do not write a remove record.  Prevents self dealing
         :return True if entry removed
@@ -393,6 +412,7 @@ class IpBan:
         load a yaml file of nuisance urls that are commonly used by vulnerability scanners.
         Once loaded any access to one of these urls that produces a 404 will ban the source ip.
         Each call to load_nuisances will add to the current list of nuisances
+
         :param file_name: a file name of your own nuisance ips
         :return: the number of nuisances added from this file
         """
@@ -426,7 +446,7 @@ if __name__ == '__main__':
 
     secret_key = 'abscdefghijklj430urojfdshfdsoih'
     my_ip = '127.0.0.1'
-    test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='/tmp/flask-ip-ban-test-app',
+    test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='.flask-ip-ban-test-app',
                         # ip_header='X_IP_HEADER',
                         abuse_IPDB_config=dict(
                             key=os.environ.get('ABUSE_IPDB_KEY'),
@@ -462,6 +482,10 @@ if __name__ == '__main__':
     def route_display():
         return test_ip_ban.display()
 
+    @app.route('/clean')
+    def route_clean():
+        return str(test_ip_ban.ip_record.clean())
+
 
     @app.route('/favicon.ico')
     def route_favicon():
@@ -482,10 +506,15 @@ if __name__ == '__main__':
         const urls = ['/ban','/ban_perm','/remove','/doesnotexist','/unblock','/sftp-config.json'];
         const r = Math.floor(Math.random()*urls.length);
         fetch(urls[r]).then(response=>document.getElementById('message').innerText=urls[r] + '-' + response.status);
+        fetch('/display').then(response=>response.text()).then(text=>document.getElementById('display').innerHTML=text);
     },1500)
     }
     function stopExercise(){
         clearInterval(interval);
+    }
+    function stopExerciseClear(){
+        clearInterval(interval);
+        fetch('/clean').then(response=>response.text()).then(text=>document.getElementById('message').innerText=text);
     }
     """
 
@@ -501,12 +530,15 @@ if __name__ == '__main__':
     <br>
     <button onclick="startExercise()">Start exercise</button>
     <button onclick="stopExercise()">Cancel exercise</button>
+    <button onclick="stopExerciseClear()">Cancel exercise and clear perm</button>
+    <div id='display'></div>
     '''.format(js=js, ip=my_ip)
 
 
     app.secret_key = secret_key
     test_ip_ban.init_app(app)
     test_ip_ban.url_pattern_add('/unblock', match_type='string')
+    test_ip_ban.url_pattern_add('/clean', match_type='string')
     test_ip_ban.url_pattern_add('/display', match_type='string')
     test_ip_ban.ip_whitelist_remove('127.0.0.1')
     test_ip_ban.load_nuisances()
@@ -515,4 +547,4 @@ if __name__ == '__main__':
     port = 8887
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='localhost', port=port, debug=True)

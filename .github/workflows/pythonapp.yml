@@ -28,5 +28,4 @@ jobs:
       run: |
         pip install pytest
         pytest
-        cd flask_ipban
-        python -m unittest test.py
+        python -m unittest flask_ipban/test.py
