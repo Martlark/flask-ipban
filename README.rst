@@ -72,7 +72,7 @@ Methods
 
 -  ``init_app(app)`` - Initialise and start ip_ban with the given Flask application.
 -  ``block(ip_address, permanent=False)`` - block the specific address, optionally forever
--  ``add(ip=None, url=None, reason='404')`` - increase the observations for the current request ip or given ip address
+-  ``add(ip=None, url=None)`` - increase the observations for the current request ip or given ip address
 
 Example for add:
 
@@ -91,7 +91,7 @@ Example for add:
         # ....
         if request.method == 'POST':
             if request.arg.get('password') != 'secret':
-                ip_ban.add(reason='bad password')
+                ip_ban.add()
 
 -  ``remove(ip_address)`` - remove the given ip address from the ban list.  Returns true if ban removed.
 -  ``url_pattern_add('reg-ex-pattern', match_type='regex')`` - exclude any url matching the pattern from checking
@@ -211,6 +211,11 @@ abuse_IPDB_config = {key=, report=False, load=False, debug=False}
 * load - True/False (default is False) - load and block already blocked ip addresses from the DB on startup
 * debug - True/False (default is False) - debug mode, uses ip 127.0.0.1.
 
+
+Release History
+---------------
+
+1.0.11 - Remove reason= which did nothing.  Add url to report table.  Add more nuisances.  Add release history.
 
 Licensing
 ---------

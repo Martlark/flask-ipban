@@ -336,14 +336,13 @@ class IpBan:
 
         return s
 
-    def add(self, ip=None, url=None, reason='404', no_write=False, timestamp=None):
+    def add(self, ip=None, url=None, no_write=False, timestamp=None):
         """
         increment ban count ip of the current request in the banned list
 
         :return:
         :param ip: optional ip to add (ip ban will by default use current ip)
         :param url: optional url to display/store
-        :param reason: optional reason for ban, default is 404
         :param no_write: do not write out to record file
         :param timestamp: entry time to set
         :return True if entry added/updated
@@ -362,7 +361,7 @@ class IpBan:
         # or existing entry has expired
         if not entry or (entry and entry.get('count', 0) < self.ban_count):
             if self.test_pattern_blocklist(url, ip=ip):
-                self.block([ip], no_write=no_write, reason=url)
+                self.block([ip], no_write=no_write, url=url)
                 if not no_write and url and self.abuse_IPDB_config.get('key'):
                     # report if this is the first time ip seen and not a report from another instance
                     self.abuse_reporter.report_ip(ip, reason='Flask-IPban - exploit URL requested:{}'.format(url))
@@ -383,7 +382,7 @@ class IpBan:
 
         if not self.init:
             self._logger.info(
-                '{}. {} {} added/updated ban list. Count: {}'.format(reason, ip, url, entry['count']))
+                '{} {} added/updated ban list. Count: {}'.format(ip, url, entry['count']))
         if not no_write:
             self.ip_record.write(ip, count=entry['count'])
         return True
