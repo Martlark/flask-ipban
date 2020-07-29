@@ -146,6 +146,22 @@ Url patterns
 
 Url matching match_type can be 'string' or 'regex'.  String is direct match.  Regex is a regex pattern.
 
+Block networks / cidr
+---------------------
+
+Use the `block_cidr(network)` method to block a range of addresses or whole regions.
+
+Example:
+
+.. code:: python
+
+    ip_ban = IpBan()
+    app = Flask(__name__)
+    ip_ban.init_app(app)
+    # block a network in Aruba
+    ip_ban.block_cidr('190.220.142.104/29')
+
+
 Nuisance file
 -------------
 
@@ -159,7 +175,7 @@ that use nuisance url patterns they won't result in a block.
 
 Load them by calling ip_ban.load_nuisances()
 
-You can add your own nuisance yaml file by calling with the parameter file_name=.
+You can add your own nuisance yaml file by calling with the parameter `file_name`.
 
 See the nuisance.yaml file in the source for formatting and details.
 
@@ -178,6 +194,10 @@ This folder and secret key is also used by the persistence feature.
 
 Only ip records using the `block`, `add` and `remove` methods or by 404; are persisted or shared.  Any whitelisting or 
 pattern bans are not persisted/shared and must be done for each instance of your application.
+
+The bit that shares ipc records between processes only updates during the `before_request` handler
+of the Flask app. It only updates every 5 seconds at the most. If the app does no
+request handling between bans then that ban record won't be shared between processes.
 
 IP Header
 ---------
@@ -216,6 +236,7 @@ Release History
 ---------------
 
 1.0.13 - Remove reason= which did nothing.  Add url to report table.  Add more nuisances.  Add release history.
+1.1.0 - Add more nuisances.  Add ability to block regions by using `block_cidr()`.  Remove support for obsolete Python releases (2.7,3.4,3.5).
 
 Licensing
 ---------

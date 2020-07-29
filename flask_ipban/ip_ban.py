@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import absolute_import
-
+import ipaddress
 import os
 import re
 from datetime import datetime
@@ -20,8 +19,8 @@ from datetime import datetime
 import yaml
 from flask import request, abort
 
-from flask_ipban.ip_record import IpRecord
 from flask_ipban.abuse_ipdb import AbuseIPDB
+from flask_ipban.ip_record import IpRecord
 
 
 class IpBan:
@@ -37,7 +36,7 @@ class IpBan:
 
     """
 
-    VERSION = '1.0.13'
+    VERSION = '1.1.0'
 
     def __init__(self, app=None, ban_count=20, ban_seconds=3600 * 24, persist=False, record_dir=None, ipc=False,
                  secret_key=None, ip_header=None, abuse_IPDB_config=None):
@@ -60,6 +59,7 @@ class IpBan:
         self._ip_whitelist = {'127.0.0.1': True}
         # self._ip_whitelist = {}
         self._ip_ban_list = {}
+        self._cidr_entries = {}
         # initialise with well known search bot links
         self._url_whitelist_patterns = {
             '^/.well-known/': dict(pattern=re.compile('^/.well-known'), match_type='regex'),
@@ -122,7 +122,7 @@ class IpBan:
 
     def block(self, ip_list, permanent=False, no_write=False, timestamp=None, url='block'):
         """
-        add a list of ip address to the block list
+        add a list of ip addresses to the block list
 
         :param ip_list: list of ip addresses to block
         :param permanent: (optional) True=do not allow entries to expire
@@ -170,11 +170,11 @@ class IpBan:
             ip = request.headers.get(self.ip_header)
         return ip or request.environ.get('REMOTE_ADDR')
 
-    def test_pattern_blocklist(self, url, ip=None):
+    def test_pattern_blocklist(self, url='', ip=None):
         """
         return true if the url or ip pattern matches an existing block
 
-        :param url: the url to check
+        :param url: (optional) the url to check
         :param ip: (optional) an ip to check
         :return:
         """
@@ -190,6 +190,13 @@ class IpBan:
             elif ip and item['match_type'] == 'ip' and pattern == ip:
                 self._logger.warning('ip block match {}'.format(ip))
                 return True
+
+        if ip:
+            ip_address = ipaddress.ip_address(ip)
+            for c, c_ip in self._cidr_entries.items():
+                if ip_address in c_ip:
+                    self._logger.warning(f'ip block match {ip}. CIDR: {c}')
+                    return True
 
         return False
 
@@ -226,6 +233,9 @@ class IpBan:
             else:
                 self._logger.debug('IP expired from ban list {}.  Url: {}'.format(ip, url))
                 entry['count'] = 0
+
+    def block_cidr(self, cidr):
+        self._cidr_entries[cidr] = ipaddress.ip_network(cidr)
 
     def ip_whitelist_add(self, ip):
         """
@@ -325,9 +335,9 @@ class IpBan:
             s += '</thead><tbody>\n'
             for k, r in self._ip_ban_list.items():
                 s += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n'.format(k, r['count'],
-                                                                                      r.get('permanent', ''),
-                                                                                      r.get('url', ''),
-                                                                                      r['timestamp'])
+                                                                                                 r.get('permanent', ''),
+                                                                                                 r.get('url', ''),
+                                                                                                 r['timestamp'])
             s += '</tbody></table>'
         elif option == 'csv':
             for k, r in self._ip_ban_list.items():
@@ -448,6 +458,7 @@ if __name__ == '__main__':
     my_ip = '127.0.0.1'
     test_ip_ban = IpBan(ban_count=4, ban_seconds=20, persist=True, record_dir='.flask-ip-ban-test-app',
                         # ip_header='X_IP_HEADER',
+                        ipc=True,
                         abuse_IPDB_config=dict(
                             key=os.environ.get('ABUSE_IPDB_KEY'),
                             report=True, load=False, debug=True))
@@ -481,6 +492,7 @@ if __name__ == '__main__':
     @app.route('/display')
     def route_display():
         return test_ip_ban.display()
+
 
     @app.route('/clean')
     def route_clean():

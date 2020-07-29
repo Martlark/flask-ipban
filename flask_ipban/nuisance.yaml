@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 # some common nuisances that should be blocked in a flask app
-# updated: 28-02-2019
+# updated: 17-Mar-2020
 #
 # format:
 #
@@ -31,6 +31,7 @@ regex:
   - .*\.asp$
   - .*\.aspx$
   - .*\.asx$
+  - .*\.bak$
   - .*\.cfm$
   - .*\.cf$
   - .*\.cgi$
@@ -55,6 +56,7 @@ regex:
   - .*\.war$
   - .*\.wss$
   # hacking or scanning attempts
+  - .*\/login
   - .*/a2billing/.*
   - \/.*\/(calendar|date|fortune|redirect|passwd)$
   - .*?PHPSESSID=
@@ -67,10 +69,16 @@ regex:
   - \/bin\/
   - \/cgi-bin\/
   - \/htbin\/
+  - mysql
+  - phpmyadmin
   - \/scripts\/
+  - \/solr\/
   - \/HNAP1\/
   - \/WEB-INF\/
   - \/wp-
+  - \/web.config.txt$
+  - \+CSCOE\+/
+  - ^/joomla/
 
 string:
   # all of these are hacking attempts by vulnerability scanners

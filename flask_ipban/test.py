@@ -41,6 +41,12 @@ class TestIpBan(unittest.TestCase):
 
         self.app.route('/')(hello_world)
 
+    def test_cidr(self):
+        self.assertFalse(self.ip_ban.test_pattern_blocklist(ip='192.0.2.1'))
+        self.ip_ban.block_cidr('192.0.2.0/28')
+        self.assertTrue(self.ip_ban.test_pattern_blocklist(ip='192.0.2.1'))
+        self.assertFalse(self.ip_ban.test_pattern_blocklist(ip='203.0.2.1'))
+
     def testAddRemoveIpWhitelist(self):
         self.assertEqual(self.ip_ban.ip_whitelist_add(localhost), 1)
         for x in range(self.ip_ban.ban_count * 2):
