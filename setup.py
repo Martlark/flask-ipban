@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from codecs import open
+
 from setuptools import setup
 
 VERSION = '1.1.0'
@@ -53,6 +54,8 @@ setup(
         'Operating System :: MacOS',
         'Operating System :: Unix',
         'Operating System :: Microsoft :: Windows',
+
+        'Framework :: Flask',
     ],
     keywords='flask security spam url ban',
 
