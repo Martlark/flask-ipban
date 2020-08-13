@@ -34,6 +34,7 @@ regex:
   - .*\.bak$
   - .*\.cfm$
   - .*\.cf$
+  - .*\.cfg$
   - .*\.cgi$
   - .*\.cobolt$
   - .*\.conf$
@@ -79,10 +80,10 @@ regex:
   - \/web.config.txt$
   - \+CSCOE\+/
   - ^/joomla/
+  - ^/\.git
 
 string:
   # all of these are hacking attempts by vulnerability scanners
-  - /.git/config
   - /_asterisk/
   - /admin/assets/js/views/login.js
   - /admin/images/cal_date_over.gif

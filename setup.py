@@ -13,9 +13,10 @@
 # limitations under the License.
 
 from codecs import open
+
 from setuptools import setup
 
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 LONG_DESCRIPTION = open('README.rst', 'r', encoding='utf-8').read()
 
 setup(
@@ -53,6 +54,8 @@ setup(
         'Operating System :: MacOS',
         'Operating System :: Unix',
         'Operating System :: Microsoft :: Windows',
+
+        'Framework :: Flask',
     ],
     keywords='flask security spam url ban',
 
