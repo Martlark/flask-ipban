@@ -126,7 +126,7 @@ Example of ip_whitelist_add
 
     app = Flask(__name__)
     ip_ban = IpBan(app)
-    ip_ban.whitelist_add('127.0.0.1')
+    ip_ban.ip_whitelist_add('127.0.0.1')
 
 
 -  ``load_nuisances(file_name=None)`` - add a list of nuisances to url pattern block list from a file.  See below for more information.
@@ -237,6 +237,7 @@ Release History
 
 1.0.13 - Remove reason= which did nothing.  Add url to report table.  Add more nuisances.  Add release history.
 1.1.0 - Add more nuisances.  Add ability to block regions by using `block_cidr()`.  Remove support for obsolete Python releases (2.7,3.4,3.5).
+1.1.1 - Fix doco typo.
 
 Licensing
 ---------

@@ -36,7 +36,7 @@ class IpBan:
 
     """
 
-    VERSION = '1.1.0'
+    VERSION = '1.1.1'
 
     def __init__(self, app=None, ban_count=20, ban_seconds=3600 * 24, persist=False, record_dir=None, ipc=False,
                  secret_key=None, ip_header=None, abuse_IPDB_config=None):
