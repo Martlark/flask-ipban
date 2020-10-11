@@ -60,6 +60,19 @@ class TestIpBan(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertFalse(self.ip_ban.ip_whitelist_remove(localhost))
 
+    def testAddRemoveIpWhitelistByList(self):
+        self.assertEqual(self.ip_ban.ip_whitelist_add([localhost]), 1)
+        for x in range(self.ip_ban.ban_count * 2):
+            response = self.client.get('/doesnotexist')
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(self.ip_ban.ip_whitelist_remove([localhost]))
+        for x in range(self.ip_ban.ban_count * 2):
+            response = self.client.get('/doesnotexist')
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(self.ip_ban.ip_whitelist_remove(localhost))
+
     def testAddRemoveUrlWhitelist(self):
         test_pattern = '^/no_exist/[0-9]+$'
         test_url = '/no_exist'

@@ -192,7 +192,7 @@ amongst all applications that use the ``record_dir`` folder.  The ``secret_key``
 
 This folder and secret key is also used by the persistence feature.
 
-Only ip records using the `block`, `add` and `remove` methods or by 404; are persisted or shared.  Any whitelisting or 
+Only ip records using the `block`, `add` and `remove` methods or by 404; are persisted or shared.  Any whitelisting or
 pattern bans are not persisted/shared and must be done for each instance of your application.
 
 The bit that shares ipc records between processes only updates during the `before_request` handler
@@ -235,9 +235,10 @@ abuse_IPDB_config = {key=, report=False, load=False, debug=False}
 Release History
 ---------------
 
-1.0.13 - Remove reason= which did nothing.  Add url to report table.  Add more nuisances.  Add release history.
-1.1.0 - Add more nuisances.  Add ability to block regions by using `block_cidr()`.  Remove support for obsolete Python releases (2.7,3.4,3.5).
-1.1.1 - Fix doco typo.
+* 1.0.13 - Remove reason= which did nothing.  Add url to report table.  Add more nuisances.  Add release history.
+* 1.1.0 - Add more nuisances.  Add ability to block regions by using `block_cidr()`.  Remove support for obsolete Python releases (2.7,3.4,3.5).
+* 1.1.1 - Fix doco typo.
+* 1.1.2 - allow ip as list for ip_whitelist_add()/ip_whitelist_remove().
 
 Licensing
 ---------

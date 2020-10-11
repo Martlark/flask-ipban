@@ -36,7 +36,7 @@ class IpBan:
 
     """
 
-    VERSION = '1.1.1'
+    VERSION = '1.1.2'
 
     def __init__(self, app=None, ban_count=20, ban_seconds=3600 * 24, persist=False, record_dir=None, ipc=False,
                  secret_key=None, ip_header=None, abuse_IPDB_config=None):
@@ -237,26 +237,32 @@ class IpBan:
     def block_cidr(self, cidr):
         self._cidr_entries[cidr] = ipaddress.ip_network(cidr)
 
-    def ip_whitelist_add(self, ip):
+    def ip_whitelist_add(self, ip_list):
         """
         add the ip to the list of ips to whitelist
 
-        :param ip: the ip to add
+        :param ip_list: list of ip addresses to add
         :return: number of entries in the ip whitelist
         """
-        self._ip_whitelist[ip] = True
+        if not isinstance(ip_list, list):
+            ip_list = [ip_list]
+        for ip in ip_list:
+            self._ip_whitelist[ip] = True
         return len(self._ip_whitelist)
 
-    def ip_whitelist_remove(self, ip):
+    def ip_whitelist_remove(self, ip_list):
         """
         remove an entry from the ip whitelist
 
-        :param ip: address to remove
+        :param ip_list: list of ip addresses to remove
         :return: True if found and removed
         """
-        if ip in self._ip_whitelist:
-            del self._ip_whitelist[ip]
-            return True
+        if not isinstance(ip_list, list):
+            ip_list = [ip_list]
+        for ip in ip_list:
+            if ip in self._ip_whitelist:
+                del self._ip_whitelist[ip]
+                return True
         return False
 
     def url_pattern_add(self, url_pattern, match_type='regex'):
