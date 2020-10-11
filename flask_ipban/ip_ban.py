@@ -439,7 +439,7 @@ class IpBan:
         with open(file_name) as f:
             y = yaml.load(f, Loader=yaml.SafeLoader)
 
-            for match_type in ['string', 'regex']:
+            for match_type in ['ip', 'string', 'regex']:
                 for value in y[match_type]:
                     try:
                         self.url_block_pattern_add(value, match_type)
@@ -447,7 +447,6 @@ class IpBan:
                     except Exception as e:
                         self._logger.exception(
                             'Exception {exception} adding pattern {value}'.format(value=value, exception=str(e)))
-            self.block(y['ip'])
 
         return added_count
 

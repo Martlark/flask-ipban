@@ -110,6 +110,7 @@ string:
   - /temp/wp-admin/
   - /templates/system/css/system.css
   - /wp-content/plugins/image-clipboard/readme.txt
+  - /api/jsonws/invoke
 
 ip:
   - 185.53.91.24
