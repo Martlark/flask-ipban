@@ -263,7 +263,7 @@ Release History
 * 1.1.0 - Add more nuisances.  Add ability to block regions by using `block_cidr()`.  Remove support for obsolete Python releases (2.7,3.4,3.5).
 * 1.1.1 - Fix doco typo.
 * 1.1.2 - allow ip as list for ip_whitelist_add()/ip_whitelist_remove().
-* 1.1.3 - Fix documentation errors.  Add wellknown.yaml and default web URLs commonly used by bots.
+* 1.1.3 - Fix documentation errors.  Add wellknown.yaml and default web URLs commonly used by bots.  Remove raise exception for ip abuse db.
 
 Licensing
 ---------
