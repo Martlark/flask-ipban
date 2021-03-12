@@ -51,10 +51,10 @@ Options
 -  ``app``,  Flask application to monitor.  Use ip_ban.init_app(app) to intialise later on.
 -  ``ban_count``, default ``20``, Number of observations before banning.
 -  ``ban_seconds``, default ``3600*24 (one day)``, Number of seconds ip address is banned.
--  ``persist``, default ``False``, Persist ban list between restarts, using records in the report_dir folder.
--  ``report_dir``, default ``None``, Override the location of persistence and report files.
--  ``ipc``, default ``False``, Allow multiple instances of ip_ban to cross communicate using the ``report_dir``.
--  ``secret_key``, default ``flask secret key``, Key to sign reports in the ``report_dir``.
+-  ``persist``, default ``False``, Persist ban list between restarts, using records in the ``record_dir`` folder.
+-  ``record_dir``, default ``None``, (Default TEMP folder). A record directory that stores ban records for ipc sync and persistence.
+-  ``ipc``, default ``False``, Allow multiple instances of ip_ban to cross communicate using the ``record_dir``.
+-  ``secret_key``, default ``flask secret key``, Key to sign reports in the ``record_dir``.
 -  ``ip_header``, default ``None``, Optional name of request header that contains the ip for use behind proxies when in a docker/kube hosted env.
 -  ``abuse_IPDB_config``, default ``None``, config {key=, report=False, load=False} to a AbuseIPDB.com account.  Blocked ip addresses via url nuisance matching will be reported.
 
@@ -139,6 +139,30 @@ Example:
     app = Flask(__name__)
     ip_ban.init_app(app)
     ip_ban.load_nuisances()
+
+-  ``load_allowed(file_name=None)`` - add a list of allowed patterns from a file.  See nuisance for format details.
+    By default `allowed.yaml` in the ip_ban folder is used.  To add to the default patterns supply your own file.
+    Must be a yaml file with the following example format (which are also the default patterns):
+
+
+.. code:: yaml
+
+    regex:
+      - ^/\.well-known/
+      - ^/robots\.txt$
+      - ^/ads\.txt$
+      - ^/favicon\.ico$
+
+
+
+Example:
+
+.. code:: python
+
+    ip_ban = IpBan()
+    app = Flask(__name__)
+    ip_ban.init_app(app)
+    ip_ban.load_allowed()
 
 
 Url patterns
@@ -239,6 +263,7 @@ Release History
 * 1.1.0 - Add more nuisances.  Add ability to block regions by using `block_cidr()`.  Remove support for obsolete Python releases (2.7,3.4,3.5).
 * 1.1.1 - Fix doco typo.
 * 1.1.2 - allow ip as list for ip_whitelist_add()/ip_whitelist_remove().
+* 1.1.3 - Fix documentation errors.  Add wellknown.yaml and default web URLs commonly used by bots.
 
 Licensing
 ---------

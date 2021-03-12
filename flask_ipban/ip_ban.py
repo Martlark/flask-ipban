@@ -36,7 +36,7 @@ class IpBan:
 
     """
 
-    VERSION = '1.1.2'
+    VERSION = '1.1.3'
 
     def __init__(self, app=None, ban_count=20, ban_seconds=3600 * 24, persist=False, record_dir=None, ipc=False,
                  secret_key=None, ip_header=None, abuse_IPDB_config=None):
@@ -61,13 +61,9 @@ class IpBan:
         self._ip_ban_list = {}
         self._cidr_entries = {}
         # initialise with well known search bot links
-        self._url_whitelist_patterns = {
-            '^/.well-known/': dict(pattern=re.compile('^/.well-known'), match_type='regex'),
-            '/favicon.ico': dict(pattern=re.compile(''), match_type='string'),
-            '/robots.txt': dict(pattern=re.compile(''), match_type='string'),
-            '/ads.txt': dict(pattern=re.compile(''), match_type='string'),
-        }
+        self._url_whitelist_patterns = {}
         self._url_blocklist_patterns = {}
+        self.load_allowed()
         self.app = None
         self._logger = None
         self.abuse_reporter = None
@@ -447,6 +443,32 @@ class IpBan:
                     except Exception as e:
                         self._logger.exception(
                             'Exception {exception} adding pattern {value}'.format(value=value, exception=str(e)))
+
+        return added_count
+
+    def load_allowed(self, file_name=None):
+        """
+        load a yaml file of non nuisance urls that are commonly used by search bots and
+        other internet agents
+
+        :param file_name: a file name of your own allowed patterns
+        :return: the number added from this file
+        """
+        if not file_name:
+            file_name = os.path.join(os.path.dirname(__file__), 'allowed.yaml')
+
+        added_count = 0
+        with open(file_name) as f:
+            y = yaml.load(f, Loader=yaml.SafeLoader)
+
+            for match_type in ['string', 'regex']:
+                for value in y.get(match_type, []):
+                    try:
+                        self.url_pattern_add(value, match_type)
+                        added_count += 1
+                    except Exception as e:
+                        self._logger.exception(
+                            'Exception {exception} adding allowed pattern {value}'.format(value=value, exception=str(e)))
 
         return added_count
 
