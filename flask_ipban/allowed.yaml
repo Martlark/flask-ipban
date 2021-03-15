@@ -1,0 +1,6 @@
+
+regex:
+  - ^/\.well-known/
+  - ^/robots\.txt$
+  - ^/ads\.txt$
+  - ^/favicon\.ico$

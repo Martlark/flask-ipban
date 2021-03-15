@@ -239,6 +239,9 @@ class TestIpBan(unittest.TestCase):
         # this ip is now blocked
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
+        # allow-regex
+        response = self.client.get('/.well-known/flong')
+        self.assertEqual(response.status_code, 404)
 
     def test_remove(self):
         self.ip_ban.block(['100.200.300.400'])

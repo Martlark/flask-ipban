@@ -17,6 +17,7 @@ from __future__ import absolute_import
 from datetime import datetime
 import json
 import requests
+from requests import HTTPError
 
 from flask_ipban.get_lock import GetLock, ExceptionLockInUse
 
@@ -86,8 +87,7 @@ class AbuseIPDB:
                 return 'error'
 
         except Exception as e:
-            self.logger.error('Error reporting ip to {}'.format(url))
-            self.logger.exception(e)
+            self.logger.error(e)
             return 'error'
         return 'ok'
 
