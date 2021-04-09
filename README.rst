@@ -265,6 +265,7 @@ Release History
 * 1.1.2 - allow ip as list for ip_whitelist_add()/ip_whitelist_remove().
 * 1.1.3 - Fix documentation errors.  Add wellknown.yaml and default web URLs commonly used by bots.  Remove raise exception for ip abuse db.
 * 1.1.4 - Fix missing allowed.yaml in MANIFEST.in
+* 1.1.5 - Add new nuisances.  Add more allowed.  Do not repeat report ips to abuse ip
 
 Licensing
 ---------

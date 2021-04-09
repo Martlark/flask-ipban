@@ -4,3 +4,5 @@ regex:
   - ^/robots\.txt$
   - ^/ads\.txt$
   - ^/favicon\.ico$
+  - ^/sitemap\.xml
+  - ^/sitemap_index.xml
