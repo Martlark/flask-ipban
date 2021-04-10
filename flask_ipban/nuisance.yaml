@@ -77,7 +77,7 @@ regex:
   - \/solr\/
   - \/HNAP1\/
   - \/WEB-INF\/
-  - \/wp-
+  - ^/wp-
   - \/web.config.txt$
   - \+CSCOE\+/
   - ^/joomla/

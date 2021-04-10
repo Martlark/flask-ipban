@@ -68,11 +68,23 @@ These environment variables will override options from the initialisation.
 
 
 Methods
--------
+=======
 
--  ``init_app(app)`` - Initialise and start ip_ban with the given Flask application.
--  ``block(ip_address, permanent=False)`` - block the specific address, optionally forever
--  ``add(ip=None, url=None)`` - increase the observations for the current request ip or given ip address
+init_app(app)
+-------------
+
+Initialise and start ip_ban with the given Flask application.
+
+block(ip_address, permanent=False)
+----------------------------------
+
+Block the specific address, optionally forever
+
+
+add(ip=None, url=None)
+----------------------
+
+increase the observations for the current request ip or given ip address
 
 Example for add:
 
@@ -93,8 +105,14 @@ Example for add:
             if request.arg.get('password') != 'secret':
                 ip_ban.add()
 
--  ``remove(ip_address)`` - remove the given ip address from the ban list.  Returns true if ban removed.
--  ``url_pattern_add('reg-ex-pattern', match_type='regex')`` - exclude any url matching the pattern from checking
+remove(ip_address)
+------------------
+Remove the given ip address from the ban list.  Returns true if ban removed.
+
+url_pattern_add('reg-ex-pattern', match_type='regex')
+-----------------------------------------------------
+
+Exclude any url matching the pattern from checking
 
 
 Example of url_pattern_add:
@@ -110,12 +128,31 @@ Example of url_pattern_add:
     ip_ban.url_pattern_add('/flash/dance', match_type='string')
 
 
--  ``url_pattern_remove('reg-ex-pattern')`` - remove pattern from the url whitelist
--  ``url_block_pattern_add('reg-ex-pattern', match_type='regex')`` - add any url matching the pattern to the block list. match_type can be 'string' or 'regex'.  String is direct match.  Regex is a regex pattern.
--  ``url_block_pattern_remove('reg-ex-pattern')`` - remove pattern from the url block list
--  ``ip_whitelist_add('ip-address')`` - exclude the given ip from checking
--  ``ip_whitelist_remove('ip-address')`` - remove the given ip from the ip whitelist
+url_pattern_remove('reg-ex-pattern')
+------------------------------------
 
+Remove pattern from the url whitelist
+
+
+url_block_pattern_add('reg-ex-pattern', match_type='regex')
+-----------------------------------------------------------
+
+Add any url matching the pattern to the block list. match_type can be 'string' or 'regex'.  String is direct match.  Regex is a regex pattern.
+
+url_block_pattern_remove('reg-ex-pattern')
+------------------------------------------
+
+Remove pattern from the url block list
+
+ip_whitelist_add('ip-address')
+------------------------------
+
+Exclude the given ip from checking
+
+ip_whitelist_remove('ip-address')
+---------------------------------
+
+Remove the given ip from the ip whitelist
 
 Example of ip_whitelist_add
 
@@ -129,7 +166,9 @@ Example of ip_whitelist_add
     ip_ban.ip_whitelist_add('127.0.0.1')
 
 
--  ``load_nuisances(file_name=None)`` - add a list of nuisances to url pattern block list from a file.  See below for more information.
+load_nuisances(file_name=None)
+------------------------------
+Add a list of nuisances to url pattern block list from a file.  See below for more information.
 
 Example:
 
@@ -140,9 +179,12 @@ Example:
     ip_ban.init_app(app)
     ip_ban.load_nuisances()
 
--  ``load_allowed(file_name=None)`` - add a list of allowed patterns from a file.  See nuisance for format details.
-    By default `allowed.yaml` in the ip_ban folder is used.  To add to the default patterns supply your own file.
-    Must be a yaml file with the following example format (which are also the default patterns):
+load_allowed(file_name=None)
+----------------------------
+
+Add a list of allowed patterns from a file.  See nuisance for format details.
+By default `allowed.yaml` in the ip_ban folder is used.  To add to the default patterns supply your own file.
+Must be a yaml file with the following example format (which are also the default patterns):
 
 
 .. code:: yaml
@@ -165,13 +207,38 @@ Example:
     ip_ban.load_allowed()
 
 
+get_block_list()
+----------------
+
+return a copy of the internal block list.  Usually will be a dict with the key of `ip` and have
+dict values of `count`, `permanent`, `url` and `timestamp`.
+
+    - timestamp:  datetime object
+    - count: number of offences
+    - url: offending url requested
+    - permanent: bool if ban is permanent
+
+Example:
+
+.. code:: python
+
+    s = ''
+    s += '<table class="table"><thead>\n'
+    s += '<tr><th>ip</th><th>count</th><th>permanent</th><th>url</th><th>timestamp</th></tr>\n'
+    s += '</thead><tbody>\n'
+    for k, r in ip_ban.get_block_list().items():
+        s += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n'.format(k, r['count'],
+                                                                                         r.get('permanent', ''),
+                                                                                         r.get('url', ''),
+                                                                                         r['timestamp'])
+
 Url patterns
-------------
+============
 
 Url matching match_type can be 'string' or 'regex'.  String is direct match.  Regex is a regex pattern.
 
 Block networks / cidr
----------------------
+=====================
 
 Use the `block_cidr(network)` method to block a range of addresses or whole regions.
 
@@ -187,7 +254,7 @@ Example:
 
 
 Nuisance file
--------------
+=============
 
 ip_ban includes a file of common web nuisances that should not be allowed on a flask site.  It includes:
 
@@ -204,7 +271,7 @@ You can add your own nuisance yaml file by calling with the parameter `file_name
 See the nuisance.yaml file in the source for formatting and details.
 
 IPC and persistence
--------------------
+===================
 
 When you have multiple applications or processes serving a web application it can be handy to share
 any abuse ip between processes.  The ipc option allows this.
@@ -224,11 +291,11 @@ of the Flask app. It only updates every 5 seconds at the most. If the app does n
 request handling between bans then that ban record won't be shared between processes.
 
 IP Header
----------
+=========
+
 When running a flask app in a docker hosted environment (or similar) the ip address will be the virtual
 adapter ip and won't change for differing requests.  Use your proxy server to set the real IP address in a header
 so that ip-ban can find what it really is.  For apache:
-
 
     ``RequestHeader set X_TRUE_IP "%{REMOTE_ADDR}s"``
 
@@ -239,7 +306,7 @@ so that ip-ban can find what it really is.  For apache:
 Then when initializing ip_ban set the header name using the parameter ``ip_header``, in this example: ip_header='X_TRUE_IP'.
 
 Abuse IPDB
-----------
+==========
 
 see: https://docs.abuseipdb.com/#introduction
 
@@ -257,7 +324,7 @@ abuse_IPDB_config = {key=, report=False, load=False, debug=False}
 
 
 Release History
----------------
+===============
 
 * 1.0.13 - Remove reason= which did nothing.  Add url to report table.  Add more nuisances.  Add release history.
 * 1.1.0 - Add more nuisances.  Add ability to block regions by using `block_cidr()`.  Remove support for obsolete Python releases (2.7,3.4,3.5).
@@ -265,10 +332,10 @@ Release History
 * 1.1.2 - allow ip as list for ip_whitelist_add()/ip_whitelist_remove().
 * 1.1.3 - Fix documentation errors.  Add wellknown.yaml and default web URLs commonly used by bots.  Remove raise exception for ip abuse db.
 * 1.1.4 - Fix missing allowed.yaml in MANIFEST.in
-* 1.1.5 - Add new nuisances.  Add more allowed.  Do not repeat report ips to abuse ip
+* 1.1.5 - Add new nuisances.  Add more allowed.  Do not repeat report ips to abuse ip. Use utcnow for timestamps.
 
 Licensing
----------
+=========
 
 - Apache 2.0
 
