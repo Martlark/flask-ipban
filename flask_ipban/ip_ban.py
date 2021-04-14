@@ -36,7 +36,7 @@ class IpBan:
 
     """
 
-    VERSION = '1.1.4'
+    VERSION = '1.1.5'
 
     def __init__(self, app=None, ban_count=20, ban_seconds=3600 * 24, persist=False, record_dir=None, ipc=False,
                  secret_key=None, ip_header=None, abuse_IPDB_config=None):
@@ -131,7 +131,7 @@ class IpBan:
             ip_list = [ip_list]
 
         if not timestamp:
-            timestamp = datetime.now()
+            timestamp = datetime.utcnow()
 
         for ip in ip_list:
             entry = self._ip_ban_list.get(ip)
@@ -153,6 +153,9 @@ class IpBan:
             if not no_write:
                 self.ip_record.write(ip, record_type='permanent' if permanent else 'block')
         return len(self._ip_ban_list)
+
+    def get_block_list(self):
+        return self._ip_ban_list.copy()
 
     def get_ip(self):
         """
@@ -214,7 +217,7 @@ class IpBan:
         entry = self._ip_ban_list.get(ip)
 
         if entry and entry.get('count', 0) > self.ban_count:
-            now = datetime.now()
+            now = datetime.utcnow()
             delta = now - entry.get('timestamp', now)
 
             if entry.get('permanent', False):
@@ -222,7 +225,7 @@ class IpBan:
 
             if delta.seconds < self.ban_seconds or self.ban_seconds == 0:
                 self._logger.debug('IP updated in ban list {}.  Url: {}'.format(ip, url))
-                entry['timestamp'] = datetime.now()
+                entry['timestamp'] = datetime.utcnow()
                 entry['count'] += 1
                 self.ip_record.write(ip, count=entry['count'])
                 abort(403)
@@ -379,10 +382,10 @@ class IpBan:
                     self.abuse_reporter.report_ip(ip, reason='Flask-IPban - exploit URL requested:{}'.format(url))
                 return True
 
-        if timestamp and timestamp > datetime.now():
-            timestamp = datetime.now()
+        if timestamp and timestamp > datetime.utcnow():
+            timestamp = datetime.utcnow()
 
-        timestamp = timestamp or datetime.now()
+        timestamp = timestamp or datetime.utcnow()
 
         if entry:
             entry['count'] += 1

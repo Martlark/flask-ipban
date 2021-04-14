@@ -57,6 +57,7 @@ regex:
   - .*\.war$
   - .*\.wss$
   # hacking or scanning attempts
+  - ^/api/
   - .*\/login
   - .*/a2billing/.*
   - \/.*\/(calendar|date|fortune|redirect|passwd)$
@@ -64,7 +65,7 @@ regex:
   - .*\/usage_201811$
   - .*\/usage_201811.html$
   - .*\wallet.dat$
-  - .*\/wp-admin\/$
+  - .*\/wp-\w+\/
   - .*netease\.com\:25$
   - \/([sf]|web|ows|mp)cgi(-bin|)\/
   - \/bin\/
@@ -76,11 +77,12 @@ regex:
   - \/solr\/
   - \/HNAP1\/
   - \/WEB-INF\/
-  - \/wp-
+  - ^/wp-
   - \/web.config.txt$
   - \+CSCOE\+/
   - ^/joomla/
   - ^/\.git
+  - ^/_ignition
 
 string:
   # all of these are hacking attempts by vulnerability scanners
@@ -92,6 +94,7 @@ string:
   - /bea_wls_deployment_internal
   - /HNAP1/
   - /index.php/admin/
+  - /jenkins/login
   - /joomla/
   - /libs/js/iframe.js
   - /manager/html

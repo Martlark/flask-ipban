@@ -41,7 +41,7 @@ class AbuseIPDB:
         self.categories = [21]  # Web App Attack
         self.lock_name = 'flask-ip-ban-abuse-ipdb-load'
         self.debug = debug
-        self.reported = {}  # url and ip alread reported
+        self.reported = {}  # url and ip already reported
         if load:
             self.import_black_list()
 
@@ -57,7 +57,7 @@ class AbuseIPDB:
 
         key = ip + '-' + reason
 
-        if self.reported.get(key):
+        if self.reported.get(ip):
             self.logger.info('Already reported {}'.format(key))
             # already reported ip and reason combination
             return 'already'
@@ -80,7 +80,7 @@ class AbuseIPDB:
             response = requests.post(url, data=data, headers=headers).content
             json_response = json.loads(response)
             if json_response.get('data'):
-                self.reported[key] = datetime.utcnow()
+                self.reported[ip] = datetime.utcnow()
                 self.logger.warn('reported ip {} for {}.  ok: {}'.format(ip, reason, json_response.get('data')))
             else:
                 self.logger.error('reported ip {} for {}.  Error: {}'.format(ip, reason, response))

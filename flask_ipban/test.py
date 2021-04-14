@@ -146,6 +146,14 @@ class TestIpBan(unittest.TestCase):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 403)
 
+    def testGetBlockList(self):
+        block_list = self.ip_ban.get_block_list()
+        self.assertFalse(block_list)
+        for x in range(self.ip_ban.ban_count + 1):
+            self.ip_ban.add(ip=localhost, url='/')
+        block_list = self.ip_ban.get_block_list()
+        self.assertIn(localhost, block_list)
+
     def testKeepOnBlocking(self):
         # block should not timeout if spamming continues
         test_url = '/doesnotexist'
