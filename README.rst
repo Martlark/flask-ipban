@@ -222,15 +222,15 @@ Example:
 
 .. code:: python
 
-    s = ''
-    s += '<table class="table"><thead>\n'
-    s += '<tr><th>ip</th><th>count</th><th>permanent</th><th>url</th><th>timestamp</th></tr>\n'
-    s += '</thead><tbody>\n'
-    for k, r in ip_ban.get_block_list().items():
-        s += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n'.format(k, r['count'],
+    s = '<table class="table"><thead>'
+    s += '<tr><th>ip</th><th>count</th><th>permanent</th><th>url</th><th>timestamp</th></tr>'
+    s += '</thead><tbody>'
+    for k, r in extentions.ip_ban.get_block_list().items():
+        s += '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>'.format(k, r['count'],
                                                                                          r.get('permanent', ''),
                                                                                          r.get('url', ''),
                                                                                          r['timestamp'])
+    s += '</table>'
 
 Url patterns
 ============
